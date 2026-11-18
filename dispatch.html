@@ -18,17 +18,29 @@
     </header>
 
     <main class="max-w-7xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-4 gap-8">
-        <!-- Fleet Roster Sidebar -->
+        <!-- Sidebar: Fleet Roster & Product Catalog Management -->
         <div class="space-y-6">
+            <!-- Fleet Roster -->
             <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700">
                 <h2 class="text-lg font-bold mb-4 text-white">🏍️ Delivery Fleet Roster</h2>
-                <div id="driver-list" class="space-y-3 mb-4">
-                    <!-- Populated by JS -->
+                <div id="driver-list" class="space-y-3 mb-4 max-h-60 overflow-y-auto">
+                    <p class="text-slate-500 text-sm">Loading couriers...</p>
                 </div>
                 <div class="border-t border-slate-700 pt-4">
                     <h3 class="text-xs font-bold uppercase text-slate-400 mb-2">Add New Courier</h3>
                     <input type="text" id="new-driver-name" placeholder="Courier Name" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white mb-2">
                     <button onclick="addDriver()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 rounded-lg text-sm transition">Add Courier</button>
+                </div>
+            </div>
+
+            <!-- Product Catalog Management -->
+            <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700">
+                <h2 class="text-lg font-bold mb-4 text-white">🛍️ Add Store Product</h2>
+                <div class="space-y-3 mb-4">
+                    <input type="text" id="new-prod-name" placeholder="Product Name" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white">
+                    <input type="number" id="new-prod-price" placeholder="Price (₮)" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white">
+                    <input type="text" id="new-prod-cat" placeholder="Category (e.g. Food, Groceries)" class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white">
+                    <button onclick="addProduct()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 rounded-lg text-sm transition">Publish to Store</button>
                 </div>
             </div>
         </div>
@@ -53,11 +65,12 @@
                                 <th class="p-3">Destination</th>
                                 <th class="p-3">Status</th>
                                 <th class="p-3">Assigned Driver</th>
+                                <th class="p-3">Rating</th>
                                 <th class="p-3 text-right">Action / Assign</th>
                             </tr>
                         </thead>
                         <tbody id="orders-table-body" class="divide-y divide-slate-700">
-                            <tr><td colspan="6" class="p-4 text-center text-slate-500">Loading orders...</td></tr>
+                            <tr><td colspan="7" class="p-4 text-center text-slate-500">Loading orders...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -86,35 +99,49 @@
         let drivers = [];
         let orders = [];
 
-        // Real-time Drivers Listener
         onSnapshot(collection(db, "drivers"), (snapshot) => {
             drivers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             renderDrivers();
             renderOrders();
         });
 
-        // Real-time Orders Listener
         onSnapshot(collection(db, "orders"), (snapshot) => {
             orders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             updateStats();
+            renderDrivers();
             renderOrders();
         });
 
         window.renderDrivers = function() {
             const container = document.getElementById('driver-list');
             if(drivers.length === 0) {
-                container.innerHTML = `<p class="text-slate-500 text-sm">No couriers registered.</p>`;
-                return;
+                return container.innerHTML = `<p class="text-slate-500 text-sm">No couriers registered.</p>`;
             }
-            container.innerHTML = drivers.map(d => `
-                <div class="flex justify-between items-center bg-slate-900 p-3 rounded-xl border border-slate-700">
-                    <div>
-                        <p class="font-semibold text-white text-sm">${d.name}</p>
-                        <span class="text-xs ${d.status === 'Online' ? 'text-emerald-400' : 'text-slate-500'}">● ${d.status}</span>
+
+            container.innerHTML = drivers.map(d => {
+                const driverOrders = orders.filter(o => o.driverId === d.id && o.rating);
+                let avgRating = "N/A";
+                if (driverOrders.length > 0) {
+                    const sum = driverOrders.reduce((acc, o) => acc + o.rating, 0);
+                    avgRating = (sum / driverOrders.length).toFixed(1) + " ★";
+                }
+
+                return `
+                    <div class="bg-slate-900 p-3.5 rounded-xl border border-slate-700 space-y-2">
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <p class="font-semibold text-white text-sm">${d.name}</p>
+                                <span class="text-xs ${d.status === 'Online' ? 'text-emerald-400' : 'text-slate-500'}">● ${d.status}</span>
+                            </div>
+                            <button onclick="toggleDriver('${d.id}', '${d.status}')" class="text-xs bg-slate-800 hover:bg-slate-700 px-2 py-1 rounded border border-slate-700 text-slate-300">Toggle</button>
+                        </div>
+                        <div class="flex justify-between items-center text-xs pt-1 border-t border-slate-800 text-slate-400">
+                            <span>Completed: <strong class="text-white">${driverOrders.length}</strong></span>
+                            <span>Rating: <strong class="text-amber-400">${avgRating}</strong></span>
+                        </div>
                     </div>
-                    <button onclick="toggleDriver('${d.id}', '${d.status}')" class="text-xs bg-slate-800 hover:bg-slate-700 px-2.5 py-1 rounded border border-slate-700">Toggle</button>
-                </div>
-            `).join('');
+                `;
+            }).join('');
         }
 
         window.toggleDriver = async function(id, currentStatus) {
@@ -123,30 +150,51 @@
         }
 
         window.addDriver = async function() {
-            const name = document.getElementById('new-driver-name').value;
+            const name = document.getElementById('new-driver-name').value.trim();
             if(!name) return alert('Enter courier name');
-            await addDoc(collection(db, "drivers"), { name, status: 'Online' });
-            document.getElementById('new-driver-name').value = '';
+            try {
+                await addDoc(collection(db, "drivers"), { name, status: 'Online' });
+                document.getElementById('new-driver-name').value = '';
+                alert('Courier added successfully!');
+            } catch(e) {
+                alert('Error adding driver: ' + e.message);
+            }
+        }
+
+        window.addProduct = async function() {
+            const name = document.getElementById('new-prod-name').value.trim();
+            const price = Number(document.getElementById('new-prod-price').value);
+            const category = document.getElementById('new-prod-cat').value.trim() || 'General';
+            if(!name || !price) return alert('Please enter product name and price');
+
+            try {
+                await addDoc(collection(db, "products"), { name, price, category });
+                document.getElementById('new-prod-name').value = '';
+                document.getElementById('new-prod-price').value = '';
+                document.getElementById('new-prod-cat').value = '';
+                alert('Product published to storefront!');
+            } catch(e) {
+                alert('Error adding product: ' + e.message);
+            }
         }
 
         window.updateStats = function() {
-            const total = orders.length;
-            const unassigned = orders.filter(o => o.status === 'Unassigned').length;
-            document.getElementById('stat-total').innerText = `Total: ${total}`;
-            document.getElementById('stat-unassigned').innerText = `Unassigned: ${unassigned}`;
+            document.getElementById('stat-total').innerText = `Total: ${orders.length}`;
+            document.getElementById('stat-unassigned').innerText = `Unassigned: ${orders.filter(o => o.status === 'Unassigned').length}`;
         }
 
         window.renderOrders = function() {
             const tbody = document.getElementById('orders-table-body');
             if(orders.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-500">No active orders found.</td></tr>`;
-                return;
+                return tbody.innerHTML = `<tr><td colspan="7" class="p-4 text-center text-slate-500">No active orders found.</td></tr>`;
             }
 
             const onlineDrivers = drivers.filter(d => d.status === 'Online');
 
             tbody.innerHTML = orders.map(o => {
                 const shortId = `ORD-${o.id.slice(-6).toUpperCase()}`;
+                const ratingBadge = o.rating ? `<span class="text-amber-400 font-bold">${o.rating} ★</span>` : `<span class="text-slate-500 text-xs">-</span>`;
+                
                 return `
                     <tr class="hover:bg-slate-900/50 transition">
                         <td class="p-3 font-mono text-xs font-bold text-indigo-300">${shortId}</td>
@@ -164,14 +212,17 @@
                             }">${o.status}</span>
                         </td>
                         <td class="p-3 text-slate-300">${o.driverName || 'Unassigned'}</td>
+                        <td class="p-3">${ratingBadge}</td>
                         <td class="p-3 text-right">
-                            <div class="flex justify-end gap-2 items-center">
-                                <select id="select-${o.id}" class="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-white">
-                                    <option value="">Select Courier...</option>
-                                    ${onlineDrivers.map(d => `<option value="${d.id}|${d.name}">${d.name}</option>`).join('')}
-                                </select>
-                                <button onclick="assignOrder('${o.id}')" class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-3 py-1 rounded text-xs">Assign</button>
-                            </div>
+                            ${o.status === 'Delivered' ? '<span class="text-xs text-slate-500 italic">Completed</span>' : `
+                                <div class="flex justify-end gap-2 items-center">
+                                    <select id="select-${o.id}" class="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-white">
+                                        <option value="">Select Courier...</option>
+                                        ${onlineDrivers.map(d => `<option value="${d.id}|${d.name}">${d.name}</option>`).join('')}
+                                    </select>
+                                    <button onclick="assignOrder('${o.id}')" class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-3 py-1 rounded text-xs">Assign</button>
+                                </div>
+                            `}
                         </td>
                     </tr>
                 `;
