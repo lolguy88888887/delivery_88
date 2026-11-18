@@ -5,37 +5,45 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SwiftRoute | Delivery Staff Portal</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- QRCode Generator Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen">
-    <!-- Header -->
     <header class="bg-slate-900 text-white shadow-md sticky top-0 z-50">
         <div class="max-w-4xl mx-auto px-4 py-4 flex justify-between items-center">
             <h1 class="text-xl font-bold flex items-center gap-2">🏍️ Courier Portal</h1>
-            <div class="flex items-center gap-3">
-                <select id="courier-session-select" onchange="switchCourierSession()" class="bg-slate-800 text-white border border-slate-700 text-xs px-3 py-1.5 rounded-lg font-medium">
-                    <option value="">Select Your Name...</option>
-                </select>
-            </div>
+            <select id="courier-session-select" onchange="switchCourierSession()" class="bg-slate-800 text-white border border-slate-700 text-xs px-3 py-1.5 rounded-lg font-medium">
+                <option value="">Select Your Name...</option>
+            </select>
         </div>
     </header>
 
     <main class="max-w-4xl mx-auto px-4 py-8 space-y-6">
-        <!-- Status Banner -->
         <div id="login-prompt" class="bg-indigo-50 border border-indigo-200 p-6 rounded-2xl text-center">
             <h2 class="text-lg font-bold text-indigo-900 mb-1">Welcome to Courier Mode</h2>
-            <p class="text-sm text-indigo-700">Please select your courier profile from the top right dropdown menu to view your assigned deliveries.</p>
+            <p class="text-sm text-indigo-700">Please select your courier profile from the top right dropdown menu.</p>
         </div>
 
-        <!-- Assigned Tasks Container -->
-        <div id="tasks-container" class="hidden space-y-4">
-            <h2 class="text-lg font-bold text-slate-900">📋 Your Assigned Deliveries</h2>
-            <div id="task-list" class="space-y-4">
-                <!-- Populated by JS -->
+        <div id="courier-dashboard" class="hidden grid grid-cols-1 md:grid-cols-3 gap-6">
+            <!-- Driver Profile & QR Code Card -->
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 text-center space-y-4">
+                <h3 class="font-bold text-slate-900 text-lg" id="driver-profile-name">-</h3>
+                <span class="inline-block bg-emerald-100 text-emerald-800 text-xs px-3 py-1 rounded-full font-bold">On Duty</span>
+                <div class="bg-slate-50 p-4 rounded-xl flex flex-col items-center justify-center space-y-2">
+                    <p class="text-xs text-slate-500 font-semibold uppercase">Your Delivery QR</p>
+                    <div id="qrcode" class="bg-white p-2 rounded-lg border"></div>
+                    <p class="text-[10px] text-slate-400">Customer scans this upon delivery</p>
+                </div>
+            </div>
+
+            <!-- Assigned Deliveries -->
+            <div class="md:col-span-2 space-y-4">
+                <h2 class="text-lg font-bold text-slate-900">📋 Assigned Deliveries</h2>
+                <div id="task-list" class="space-y-4"></div>
             </div>
         </div>
     </main>
 
-    <!-- Firebase SDKs -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getFirestore, collection, onSnapshot, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
@@ -56,35 +64,40 @@
         let drivers = [];
         let orders = [];
         let currentCourierId = null;
-        let currentCourierName = null;
+        let qrCodeInstance = null;
 
-        // Listen for Drivers
         onSnapshot(collection(db, "drivers"), (snapshot) => {
             drivers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             const select = document.getElementById('courier-session-select');
-            const currentVal = select.value;
+            const val = select.value;
             select.innerHTML = `<option value="">Select Your Name...</option>` + drivers.map(d => `<option value="${d.id}">${d.name}</option>`).join('');
-            if(currentVal) select.value = currentVal;
+            if(val) select.value = val;
         });
 
-        // Listen for Orders
         onSnapshot(collection(db, "orders"), (snapshot) => {
             orders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             renderTasks();
         });
 
         window.switchCourierSession = function() {
-            const select = document.getElementById('courier-session-select');
-            currentCourierId = select.value;
+            currentCourierId = document.getElementById('courier-session-select').value;
             const driver = drivers.find(d => d.id === currentCourierId);
-            currentCourierName = driver ? driver.name : null;
 
-            if(currentCourierId) {
+            if(currentCourierId && driver) {
                 document.getElementById('login-prompt').classList.add('hidden');
-                document.getElementById('tasks-container').classList.remove('hidden');
+                document.getElementById('courier-dashboard').classList.remove('hidden');
+                document.getElementById('driver-profile-name').innerText = driver.name;
+
+                // Generate Unique QR Code for Driver
+                document.getElementById('qrcode').innerHTML = "";
+                qrCodeInstance = new QRCode(document.getElementById("qrcode"), {
+                    text: `DRIVER_ID:${currentCourierId}:${driver.name}`,
+                    width: 140,
+                    height: 140
+                });
             } else {
                 document.getElementById('login-prompt').classList.remove('hidden');
-                document.getElementById('tasks-container').classList.add('hidden');
+                document.getElementById('courier-dashboard').classList.add('hidden');
             }
             renderTasks();
         }
@@ -95,52 +108,29 @@
             const myOrders = orders.filter(o => o.driverId === currentCourierId && o.status !== 'Delivered');
 
             if(myOrders.length === 0) {
-                container.innerHTML = `
-                    <div class="bg-white p-8 rounded-2xl border border-slate-200 text-center">
-                        <p class="text-slate-500">No active delivery tasks assigned to you right now. Stand by!</p>
-                    </div>
-                `;
-                return;
+                return container.innerHTML = `<div class="bg-white p-6 rounded-2xl border text-center text-slate-500 text-sm">No active delivery tasks assigned to you right now.</div>`;
             }
 
-            container.innerHTML = myOrders.map(o => {
-                const shortId = `ORD-${o.id.slice(-6).toUpperCase()}`;
-                const itemsList = o.items ? o.items.map(i => `<span class="bg-slate-100 text-slate-700 text-xs px-2 py-1 rounded">${i.name}</span>`).join(' ') : '';
-                
-                return `
-                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
-                        <div class="flex justify-between items-start">
-                            <div>
-                                <span class="text-xs font-mono font-bold text-indigo-600">${shortId}</span>
-                                <h3 class="font-bold text-slate-900 text-lg mt-0.5">${o.customerName}</h3>
-                                <p class="text-slate-500 text-sm">📞 ${o.customerPhone}</p>
-                            </div>
-                            <span class="px-3 py-1 rounded-full text-xs font-bold ${
-                                o.status === 'Assigned' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'
-                            }">${o.status}</span>
+            container.innerHTML = myOrders.map(o => `
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-3">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <span class="text-xs font-mono font-bold text-indigo-600">ORD-${o.id.slice(-6).toUpperCase()}</span>
+                            <h3 class="font-bold text-slate-900 text-base">${o.customerName}</h3>
+                            <p class="text-slate-500 text-xs">📞 ${o.customerPhone}</p>
                         </div>
-
-                        <div class="bg-slate-50 p-4 rounded-xl text-sm space-y-1">
-                            <p>📍 <strong class="text-slate-700">Delivery Address:</strong> ${o.customerAddress}</p>
-                            <p>💰 <strong class="text-slate-700">Total Amount:</strong> ₮${o.total?.toLocaleString()}</p>
-                            <div class="pt-2 flex flex-wrap gap-1.5">${itemsList}</div>
-                        </div>
-
-                        <div class="flex gap-3 pt-2">
-                            ${o.status === 'Assigned' ? `
-                                <button onclick="updateOrderStatus('${o.id}', 'Picked Up')" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl text-sm transition">Confirm Pickup from Merchant</button>
-                            ` : ''}
-                            ${o.status === 'Picked Up' ? `
-                                <button onclick="updateOrderStatus('${o.id}', 'Delivered')" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl text-sm transition">Mark Order Delivered</button>
-                            ` : ''}
-                        </div>
+                        <span class="px-2.5 py-1 rounded-full text-xs font-bold ${o.status === 'Assigned' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}">${o.status}</span>
                     </div>
-                `;
-            }).join('');
-        }
-
-        window.updateOrderStatus = async function(orderId, newStatus) {
-            await updateDoc(doc(db, "orders", orderId), { status: newStatus });
+                    <div class="bg-slate-50 p-3 rounded-xl text-xs space-y-1">
+                        <p>📍 <strong>Address:</strong> ${o.customerAddress}</p>
+                        <p>💰 <strong>Total:</strong> ₮${o.total?.toLocaleString()}</p>
+                        ${o.rating ? `<p>⭐ <strong>Customer Rating:</strong> ${o.rating} / 5 Stars</p>` : ''}
+                    </div>
+                    ${o.status === 'Assigned' ? `
+                        <button onclick="updateDoc(doc(db, 'orders', '${o.id}'), {status: 'Picked Up'})" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 rounded-xl text-xs transition">Confirm Pickup from Merchant</button>
+                    ` : `<p class="text-xs text-center text-indigo-600 font-semibold italic">En route! Ask customer to scan your QR code upon delivery.</p>`}
+                </div>
+            `).join('');
         }
     </script>
 </body>
