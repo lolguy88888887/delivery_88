@@ -15,7 +15,9 @@
     </header>
 
     <main class="max-w-7xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-4 gap-8">
+        <!-- Sidebar: Fleet Roster & Product Management -->
         <div class="space-y-6">
+            <!-- Fleet Roster -->
             <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700">
                 <h2 class="text-lg font-bold mb-4 text-white">🏍️ Delivery Fleet Roster</h2>
                 <div id="driver-list" class="space-y-3 mb-4 max-h-60 overflow-y-auto">
@@ -28,6 +30,7 @@
                 </div>
             </div>
 
+            <!-- Add Product -->
             <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700">
                 <h2 class="text-lg font-bold mb-4 text-white">🛍️ Add Store Product</h2>
                 <div class="space-y-3">
@@ -39,7 +42,9 @@
             </div>
         </div>
 
+        <!-- Main Content: Orders Queue & Product Inventory -->
         <div class="lg:col-span-3 space-y-6">
+            <!-- Live Delivery Queue -->
             <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700">
                 <div class="flex justify-between items-center mb-6">
                     <h2 class="text-lg font-bold text-white">📦 Live Delivery Queue</h2>
@@ -68,12 +73,32 @@
                     </table>
                 </div>
             </div>
+
+            <!-- Product Catalog Inventory Management -->
+            <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700">
+                <h2 class="text-lg font-bold text-white mb-4">🗂️ Store Inventory Management</h2>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm">
+                        <thead class="bg-slate-900 text-slate-400 uppercase text-xs">
+                            <tr>
+                                <th class="p-3">Product Name</th>
+                                <th class="p-3">Category</th>
+                                <th class="p-3">Price (₮)</th>
+                                <th class="p-3 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="products-table-body" class="divide-y divide-slate-700">
+                            <tr><td colspan="4" class="p-4 text-center text-slate-500">Loading products...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     </main>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getDatabase, ref, push, onValue, update } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+        import { getDatabase, ref, push, onValue, update, remove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyBzAlFc53i183dYa56nDFqEROIrJIiBUsg",
@@ -91,6 +116,7 @@
 
         let drivers = {};
         let orders = {};
+        let products = {};
 
         onValue(ref(db, 'drivers'), (snapshot) => {
             drivers = snapshot.val() || {};
@@ -105,18 +131,21 @@
             renderOrders();
         });
 
+        onValue(ref(db, 'products'), (snapshot) => {
+            products = snapshot.val() || {};
+            renderProducts();
+        });
+
         window.addDriver = function() {
             const name = document.getElementById('new-driver-name').value.trim();
             if(!name) return alert('Enter courier name');
             push(ref(db, 'drivers'), { name, status: 'Online' }).then(() => {
                 document.getElementById('new-driver-name').value = '';
-                alert('Courier added!');
-            }).catch(e => alert(e.message));
+            });
         }
 
         window.toggleDriver = function(id, currentStatus) {
-            const newStatus = currentStatus === 'Online' ? 'Offline' : 'Online';
-            update(ref(db, `drivers/${id}`), { status: newStatus });
+            update(ref(db, `drivers/${id}`), { status: currentStatus === 'Online' ? 'Offline' : 'Online' });
         }
 
         window.addProduct = function() {
@@ -128,8 +157,38 @@
                 document.getElementById('new-prod-name').value = '';
                 document.getElementById('new-prod-price').value = '';
                 document.getElementById('new-prod-cat').value = '';
-                alert('Product published!');
-            }).catch(e => alert(e.message));
+            });
+        }
+
+        window.updateProductPrice = function(id) {
+            const newPrice = prompt("Enter new price (₮):");
+            if(newPrice && !isNaN(newPrice)) {
+                update(ref(db, `products/${id}`), { price: Number(newPrice) });
+            }
+        }
+
+        window.deleteProduct = function(id) {
+            if(confirm("Are you sure you want to remove this product from the store?")) {
+                remove(ref(db, `products/${id}`));
+            }
+        }
+
+        window.renderProducts = function() {
+            const tbody = document.getElementById('products-table-body');
+            const entries = Object.entries(products);
+            if(entries.length === 0) return tbody.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-slate-500">No products in store.</td></tr>`;
+
+            tbody.innerHTML = entries.map(([id, p]) => `
+                <tr class="hover:bg-slate-900/50 transition">
+                    <td class="p-3 font-medium text-white">${p.name}</td>
+                    <td class="p-3 text-slate-400">${p.category || 'General'}</td>
+                    <td class="p-3 text-emerald-400 font-semibold">₮${Number(p.price).toLocaleString()}</td>
+                    <td class="p-3 text-right space-x-2">
+                        <button onclick="updateProductPrice('${id}')" class="bg-indigo-600 hover:bg-indigo-500 text-white px-2.5 py-1 rounded text-xs">Change Price</button>
+                        <button onclick="deleteProduct('${id}')" class="bg-red-600 hover:bg-red-500 text-white px-2.5 py-1 rounded text-xs">Remove</button>
+                    </td>
+                </tr>
+            `).join('');
         }
 
         window.renderDrivers = function() {
