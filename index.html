@@ -17,13 +17,31 @@
     </header>
 
     <main class="max-w-6xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <!-- Store Catalog -->
         <div class="lg:col-span-2 space-y-6">
             <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
                 <h2 class="text-lg font-bold mb-4 text-slate-900">🛍️ Quick Order Store</h2>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4" id="product-list"></div>
             </div>
+
+            <!-- Custom Parcel Request -->
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                <h2 class="text-lg font-bold mb-4 text-slate-900">📮 Send Custom Parcel / Package</h2>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Pickup Address</label>
+                        <input type="text" id="custom-pickup" placeholder="e.g. Home, Office, Store" class="w-full px-3 py-2 border rounded-lg text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Package Description</label>
+                        <input type="text" id="custom-desc" placeholder="e.g. Documents, Box of clothes" class="w-full px-3 py-2 border rounded-lg text-sm">
+                    </div>
+                </div>
+                <button onclick="addCustomParcel()" class="mt-4 bg-slate-900 text-white font-semibold px-4 py-2 rounded-lg text-sm hover:bg-slate-800">Add Parcel to Cart</button>
+            </div>
         </div>
 
+        <!-- Checkout & Live Tracking Sidebar -->
         <div class="space-y-6">
             <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
                 <h2 class="text-lg font-bold mb-4 text-slate-900">🛒 Your Delivery Cart</h2>
@@ -31,9 +49,18 @@
                     <p class="text-slate-400 py-2">Your cart is empty.</p>
                 </div>
                 <div class="border-t pt-4 space-y-3">
-                    <input type="text" id="cust-name" placeholder="Full Name" class="w-full px-3 py-2 border rounded-lg text-sm">
-                    <input type="text" id="cust-address" placeholder="Delivery Address" class="w-full px-3 py-2 border rounded-lg text-sm">
-                    <input type="text" id="cust-phone" placeholder="Phone Number" class="w-full px-3 py-2 border rounded-lg text-sm">
+                    <div>
+                        <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Your Name</label>
+                        <input type="text" id="cust-name" placeholder="Full Name" class="w-full px-3 py-2 border rounded-lg text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Delivery Address</label>
+                        <input type="text" id="cust-address" placeholder="Street, Building, Apartment" class="w-full px-3 py-2 border rounded-lg text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Phone Number</label>
+                        <input type="text" id="cust-phone" placeholder="+976 ..." class="w-full px-3 py-2 border rounded-lg text-sm">
+                    </div>
                     <button onclick="placeOrder()" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl hover:bg-indigo-700 transition">Place Delivery Order</button>
                 </div>
             </div>
@@ -52,7 +79,7 @@
                     <p>🏍️ <strong class="text-white">Assigned Courier:</strong> <span id="track-driver">Unassigned</span></p>
                 </div>
                 
-                <!-- QR Scan & Rate Action (Shows when driver arrives) -->
+                <!-- QR Scan & Rate Action -->
                 <div id="scan-action-box" class="hidden pt-2 border-t border-indigo-800">
                     <p class="text-xs text-indigo-200 mb-2">Driver has arrived! Scan their QR code to complete delivery and rate:</p>
                     <button onclick="openScannerModal()" class="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-900 font-bold py-2.5 rounded-xl text-sm transition">📷 Scan Driver QR & Rate</button>
@@ -71,7 +98,7 @@
             
             <div id="reader" class="w-full rounded-xl overflow-hidden bg-slate-100"></div>
 
-            <!-- Rating Section (Appears after QR scan) -->
+            <!-- Rating Section -->
             <div id="rating-section" class="hidden space-y-3 pt-2 border-t">
                 <div class="text-center">
                     <p class="font-semibold text-sm text-emerald-600">✓ Driver Verified: <span id="scanned-driver-name"></span></p>
@@ -89,6 +116,7 @@
         </div>
     </div>
 
+    <!-- Firebase SDKs & Logic -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getFirestore, collection, addDoc, doc, onSnapshot, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
@@ -109,7 +137,8 @@
         const products = [
             { id: 1, name: "Latte & Croissant Combo", price: 15000, category: "Food & Cafe" },
             { id: 2, name: "Fresh Grocery Bag", price: 45000, category: "Groceries" },
-            { id: 3, name: "USB-C Fast Charger", price: 28000, category: "Electronics" }
+            { id: 3, name: "USB-C Fast Charger", price: 28000, category: "Electronics" },
+            { id: 4, name: "Emergency First Aid Kit", price: 35000, category: "Essentials" }
         ];
 
         let cart = [];
@@ -120,74 +149,117 @@
         let html5QrcodeScanner = null;
         let unsubscribeTracker = null;
 
+        // Render Catalog Items
         window.renderStore = function() {
-            document.getElementById('product-list').innerHTML = products.map(p => `
-                <div class="border border-slate-200 p-4 rounded-xl flex flex-col justify-between">
+            const container = document.getElementById('product-list');
+            container.innerHTML = products.map(p => `
+                <div class="border border-slate-200 p-4 rounded-xl flex flex-col justify-between hover:border-indigo-300 transition">
                     <div>
                         <span class="text-xs font-semibold text-indigo-600 uppercase">${p.category}</span>
                         <h3 class="font-bold text-slate-900 mt-1">${p.name}</h3>
                         <p class="text-slate-600 text-sm mt-1">₮${p.price.toLocaleString()}</p>
                     </div>
-                    <button onclick="cart.push({name:'${p.name}', price:${p.price}});renderCart()" class="mt-4 bg-slate-100 hover:bg-indigo-600 hover:text-white text-slate-800 font-medium py-2 rounded-lg text-sm transition">Add to Cart</button>
+                    <button onclick="addToCart(${p.id})" class="mt-4 bg-slate-100 hover:bg-indigo-600 hover:text-white text-slate-800 font-medium py-2 rounded-lg text-sm transition">Add to Cart</button>
                 </div>
             `).join('');
+        }
+
+        window.addToCart = function(productId) {
+            const product = products.find(p => p.id === productId);
+            if(product) {
+                cart.push({ name: product.name, price: product.price, category: product.category });
+                renderCart();
+            }
+        }
+
+        window.addCustomParcel = function() {
+            const pickup = document.getElementById('custom-pickup').value;
+            const desc = document.getElementById('custom-desc').value;
+            if(!desc) return alert('Please enter package description');
+            cart.push({ name: `Custom: ${desc} (Pickup: ${pickup || 'Specified'})`, price: 20000, category: 'Custom Parcel' });
+            document.getElementById('custom-pickup').value = '';
+            document.getElementById('custom-desc').value = '';
+            renderCart();
         }
 
         window.renderCart = function() {
             const container = document.getElementById('cart-items');
-            if(cart.length === 0) return container.innerHTML = `<p class="text-slate-400 py-2">Your cart is empty.</p>`;
+            if(cart.length === 0) {
+                container.innerHTML = `<p class="text-slate-400 py-2">Your cart is empty.</p>`;
+                return;
+            }
             container.innerHTML = cart.map((item, idx) => `
-                <div class="py-2 flex justify-between items-center text-sm">
-                    <span>${item.name} (₮${item.price.toLocaleString()})</span>
-                    <button onclick="cart.splice(${idx},1);renderCart()" class="text-red-500 font-bold text-xs">Remove</button>
+                <div class="py-2.5 flex justify-between items-center text-sm">
+                    <div>
+                        <p class="font-medium text-slate-800">${item.name}</p>
+                        <p class="text-xs text-slate-500">₮${item.price.toLocaleString()}</p>
+                    </div>
+                    <button onclick="removeFromCart(${idx})" class="text-red-500 hover:text-red-700 font-bold text-xs">Remove</button>
                 </div>
             `).join('');
         }
 
+        window.removeFromCart = function(index) {
+            cart.splice(index, 1);
+            renderCart();
+        }
+
         window.placeOrder = async function() {
-            if(cart.length === 0) return alert('Cart is empty');
+            if(cart.length === 0) return alert('Your cart is empty.');
             const name = document.getElementById('cust-name').value;
             const address = document.getElementById('cust-address').value;
             const phone = document.getElementById('cust-phone').value;
             if(!name || !address || !phone) return alert('Please fill in your delivery contact details.');
 
-            const docRef = await addDoc(collection(db, "orders"), {
-                customerName: name, customerAddress: address, customerPhone: phone,
-                items: cart, total: cart.reduce((s, i) => s + i.price, 0),
-                status: 'Unassigned', driverId: null, driverName: 'Unassigned', createdAt: serverTimestamp()
-            });
+            const orderData = {
+                customerName: name,
+                customerAddress: address,
+                customerPhone: phone,
+                items: cart,
+                total: cart.reduce((sum, i) => sum + i.price, 0),
+                status: 'Unassigned',
+                driverId: null,
+                driverName: 'Unassigned',
+                createdAt: serverTimestamp()
+            };
 
-            currentTrackId = docRef.id;
-            cart = []; renderCart();
-            document.getElementById('active-order-badge').classList.remove('hidden');
-            document.getElementById('tracking-card').classList.remove('hidden');
-            document.getElementById('track-id').innerText = `ORD-${docRef.id.slice(-6).toUpperCase()}`;
-            document.getElementById('track-dest').innerText = address;
+            try {
+                const docRef = await addDoc(collection(db, "orders"), orderData);
+                currentTrackId = docRef.id;
+                cart = [];
+                renderCart();
+                document.getElementById('active-order-badge').classList.remove('hidden');
+                document.getElementById('tracking-card').classList.remove('hidden');
+                document.getElementById('track-id').innerText = `ORD-${docRef.id.slice(-6).toUpperCase()}`;
+                document.getElementById('track-dest').innerText = address;
 
-            if(unsubscribeTracker) unsubscribeTracker();
-            unsubscribeTracker = onSnapshot(doc(db, "orders", docRef.id), (docSnap) => {
-                if(!docSnap.exists()) return;
-                const data = docSnap.data();
-                document.getElementById('track-status').innerText = data.status;
-                document.getElementById('track-driver').innerText = data.driverName || 'Unassigned';
-                assignedDriverId = data.driverId;
-                assignedDriverName = data.driverName;
+                if(unsubscribeTracker) unsubscribeTracker();
+                unsubscribeTracker = onSnapshot(doc(db, "orders", docRef.id), (docSnap) => {
+                    if(!docSnap.exists()) return;
+                    const data = docSnap.data();
+                    document.getElementById('track-status').innerText = data.status;
+                    document.getElementById('track-driver').innerText = data.driverName || 'Unassigned';
+                    assignedDriverId = data.driverId;
+                    assignedDriverName = data.driverName;
 
-                if(data.status === 'Picked Up' || data.status === 'Assigned') {
-                    document.getElementById('scan-action-box').classList.remove('hidden');
-                }
-                if(data.status === 'Delivered') {
-                    document.getElementById('scan-action-box').classList.add('hidden');
-                }
-            });
-            alert('Order placed successfully!');
+                    if(data.status === 'Picked Up' || data.status === 'Assigned') {
+                        document.getElementById('scan-action-box').classList.remove('hidden');
+                    }
+                    if(data.status === 'Delivered') {
+                        document.getElementById('scan-action-box').classList.add('hidden');
+                    }
+                });
+                alert('Order placed successfully!');
+            } catch(e) {
+                console.error(e);
+                alert('Error placing order: ' + e.message);
+            }
         }
 
         window.openScannerModal = function() {
             document.getElementById('qr-modal').classList.remove('hidden');
             html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 });
             html5QrcodeScanner.render((decodedText) => {
-                // Expected QR format: DRIVER_ID:driver_id_here
                 if(decodedText.includes(assignedDriverId) || decodedText.length > 5) {
                     html5QrcodeScanner.clear();
                     document.getElementById('reader').style.display = 'none';
@@ -223,6 +295,7 @@
             alert(`Thank you! Delivered successfully with a ${selectedRating}-star rating.`);
         }
 
+        // Initialize store on load
         renderStore();
     </script>
 </body>
