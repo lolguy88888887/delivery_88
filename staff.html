@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SwiftRoute | Delivery Staff Portal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen">
+    <!-- Header -->
+    <header class="bg-slate-900 text-white shadow-md sticky top-0 z-50">
+        <div class="max-w-4xl mx-auto px-4 py-4 flex justify-between items-center">
+            <h1 class="text-xl font-bold flex items-center gap-2">🏍️ Courier Portal</h1>
+            <div class="flex items-center gap-3">
+                <select id="courier-session-select" onchange="switchCourierSession()" class="bg-slate-800 text-white border border-slate-700 text-xs px-3 py-1.5 rounded-lg font-medium">
+                    <option value="">Select Your Name...</option>
+                </select>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-4xl mx-auto px-4 py-8 space-y-6">
+        <!-- Status Banner -->
+        <div id="login-prompt" class="bg-indigo-50 border border-indigo-200 p-6 rounded-2xl text-center">
+            <h2 class="text-lg font-bold text-indigo-900 mb-1">Welcome to Courier Mode</h2>
+            <p class="text-sm text-indigo-700">Please select your courier profile from the top right dropdown menu to view your assigned deliveries.</p>
+        </div>
+
+        <!-- Assigned Tasks Container -->
+        <div id="tasks-container" class="hidden space-y-4">
+            <h2 class="text-lg font-bold text-slate-900">📋 Your Assigned Deliveries</h2>
+            <div id="task-list" class="space-y-4">
+                <!-- Populated by JS -->
+            </div>
+        </div>
+    </main>
+
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, collection, onSnapshot, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyBzAlFc53i183dYa56nDFqEROIrJIiBUsg",
+            authDomain: "delivery88-fffbf.firebaseapp.com",
+            projectId: "delivery88-fffbf",
+            storageBucket: "delivery88-fffbf.firebasestorage.app",
+            messagingSenderId: "562400768958",
+            appId: "1:562400768958:web:18ed68de521f548d853fef",
+            measurementId: "G-4CE6JWR7SR"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        let drivers = [];
+        let orders = [];
+        let currentCourierId = null;
+        let currentCourierName = null;
+
+        // Listen for Drivers
+        onSnapshot(collection(db, "drivers"), (snapshot) => {
+            drivers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            const select = document.getElementById('courier-session-select');
+            const currentVal = select.value;
+            select.innerHTML = `<option value="">Select Your Name...</option>` + drivers.map(d => `<option value="${d.id}">${d.name}</option>`).join('');
+            if(currentVal) select.value = currentVal;
+        });
+
+        // Listen for Orders
+        onSnapshot(collection(db, "orders"), (snapshot) => {
+            orders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            renderTasks();
+        });
+
+        window.switchCourierSession = function() {
+            const select = document.getElementById('courier-session-select');
+            currentCourierId = select.value;
+            const driver = drivers.find(d => d.id === currentCourierId);
+            currentCourierName = driver ? driver.name : null;
+
+            if(currentCourierId) {
+                document.getElementById('login-prompt').classList.add('hidden');
+                document.getElementById('tasks-container').classList.remove('hidden');
+            } else {
+                document.getElementById('login-prompt').classList.remove('hidden');
+                document.getElementById('tasks-container').classList.add('hidden');
+            }
+            renderTasks();
+        }
+
+        window.renderTasks = function() {
+            if(!currentCourierId) return;
+            const container = document.getElementById('task-list');
+            const myOrders = orders.filter(o => o.driverId === currentCourierId && o.status !== 'Delivered');
+
+            if(myOrders.length === 0) {
+                container.innerHTML = `
+                    <div class="bg-white p-8 rounded-2xl border border-slate-200 text-center">
+                        <p class="text-slate-500">No active delivery tasks assigned to you right now. Stand by!</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = myOrders.map(o => {
+                const shortId = `ORD-${o.id.slice(-6).toUpperCase()}`;
+                const itemsList = o.items ? o.items.map(i => `<span class="bg-slate-100 text-slate-700 text-xs px-2 py-1 rounded">${i.name}</span>`).join(' ') : '';
+                
+                return `
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <span class="text-xs font-mono font-bold text-indigo-600">${shortId}</span>
+                                <h3 class="font-bold text-slate-900 text-lg mt-0.5">${o.customerName}</h3>
+                                <p class="text-slate-500 text-sm">📞 ${o.customerPhone}</p>
+                            </div>
+                            <span class="px-3 py-1 rounded-full text-xs font-bold ${
+                                o.status === 'Assigned' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'
+                            }">${o.status}</span>
+                        </div>
+
+                        <div class="bg-slate-50 p-4 rounded-xl text-sm space-y-1">
+                            <p>📍 <strong class="text-slate-700">Delivery Address:</strong> ${o.customerAddress}</p>
+                            <p>💰 <strong class="text-slate-700">Total Amount:</strong> ₮${o.total?.toLocaleString()}</p>
+                            <div class="pt-2 flex flex-wrap gap-1.5">${itemsList}</div>
+                        </div>
+
+                        <div class="flex gap-3 pt-2">
+                            ${o.status === 'Assigned' ? `
+                                <button onclick="updateOrderStatus('${o.id}', 'Picked Up')" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl text-sm transition">Confirm Pickup from Merchant</button>
+                            ` : ''}
+                            ${o.status === 'Picked Up' ? `
+                                <button onclick="updateOrderStatus('${o.id}', 'Delivered')" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl text-sm transition">Mark Order Delivered</button>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        window.updateOrderStatus = async function(orderId, newStatus) {
+            await updateDoc(doc(db, "orders", orderId), { status: newStatus });
+        }
+    </script>
+</body>
+</html>
