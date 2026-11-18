@@ -8,14 +8,62 @@
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen">
+    <!-- Header -->
     <header class="bg-indigo-600 text-white shadow-md sticky top-0 z-50">
         <div class="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
             <h1 class="text-xl font-bold flex items-center gap-2">📦 SwiftRoute Express</h1>
-            <span id="active-order-badge" class="hidden bg-amber-400 text-slate-900 text-xs font-bold px-3 py-1 rounded-full animate-pulse">Active Order Track</span>
+            <div class="flex items-center gap-3">
+                <span id="active-order-badge" class="hidden bg-amber-400 text-slate-900 text-xs font-bold px-3 py-1 rounded-full animate-pulse">Active Order Track</span>
+                <div id="user-profile-nav" class="hidden items-center gap-2 text-sm bg-indigo-700 px-3 py-1.5 rounded-xl">
+                    <span>👤 <strong id="nav-username">User</strong></span>
+                    <button onclick="logoutCustomer()" class="text-xs text-indigo-200 hover:text-white underline ml-2">Logout</button>
+                </div>
+            </div>
         </div>
     </header>
 
-    <main class="max-w-6xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
+    <!-- Login / Signup Modal / View -->
+    <div id="auth-container" class="max-w-md mx-auto mt-16 bg-white p-8 rounded-2xl shadow-sm border border-slate-200 space-y-6">
+        <div class="text-center">
+            <h2 class="text-2xl font-bold text-slate-900">Welcome to SwiftRoute</h2>
+            <p class="text-xs text-slate-500 mt-1">Sign in or create an account to start ordering</p>
+        </div>
+
+        <!-- Tabs -->
+        <div class="flex border-b text-sm font-semibold">
+            <button onclick="switchAuthTab('login')" id="tab-login" class="flex-1 pb-2 border-b-2 border-indigo-600 text-indigo-600">Login</button>
+            <button onclick="switchAuthTab('signup')" id="tab-signup" class="flex-1 pb-2 text-slate-400 border-b-2 border-transparent">Create Account</button>
+        </div>
+
+        <!-- Login Form -->
+        <div id="form-login" class="space-y-4">
+            <div>
+                <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Email or Phone</label>
+                <input type="text" id="login-identifier" placeholder="Enter your email or phone" class="w-full px-3 py-2 border rounded-lg text-sm">
+            </div>
+            <button onclick="loginCustomer()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl text-sm transition">Sign In</button>
+        </div>
+
+        <!-- Signup Form -->
+        <div id="form-signup" class="space-y-4 hidden">
+            <div>
+                <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Full Name</label>
+                <input type="text" id="signup-name" placeholder="John Doe" class="w-full px-3 py-2 border rounded-lg text-sm">
+            </div>
+            <div>
+                <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Phone Number</label>
+                <input type="text" id="signup-phone" placeholder="+976 ..." class="w-full px-3 py-2 border rounded-lg text-sm">
+            </div>
+            <div>
+                <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Email (Login ID)</label>
+                <input type="email" id="signup-email" placeholder="your@email.com" class="w-full px-3 py-2 border rounded-lg text-sm">
+            </div>
+            <button onclick="signupCustomer()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl text-sm transition">Register Account</button>
+        </div>
+    </div>
+
+    <!-- Main Storefront (Hidden until logged in) -->
+    <main id="store-main-container" class="hidden max-w-6xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div class="lg:col-span-2 space-y-6">
             <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
                 <h2 class="text-lg font-bold mb-4 text-slate-900">🛍️ Quick Order Store</h2>
@@ -47,9 +95,10 @@
                     <p class="text-slate-400 py-2">Your cart is empty.</p>
                 </div>
                 <div class="border-t pt-4 space-y-3">
-                    <input type="text" id="cust-name" placeholder="Full Name" class="w-full px-3 py-2 border rounded-lg text-sm">
-                    <input type="text" id="cust-address" placeholder="Delivery Address" class="w-full px-3 py-2 border rounded-lg text-sm">
-                    <input type="text" id="cust-phone" placeholder="Phone Number" class="w-full px-3 py-2 border rounded-lg text-sm">
+                    <div>
+                        <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Delivery Address</label>
+                        <input type="text" id="cust-address" placeholder="Street, Building, Apartment" class="w-full px-3 py-2 border rounded-lg text-sm">
+                    </div>
                     <button onclick="placeOrder()" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl hover:bg-indigo-700 transition">Place Delivery Order</button>
                 </div>
             </div>
@@ -75,6 +124,7 @@
         </div>
     </main>
 
+    <!-- QR Scanner & Rating Modal -->
     <div id="qr-modal" class="hidden fixed inset-0 bg-slate-950/80 z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 text-slate-900 shadow-xl">
             <div class="flex justify-between items-center">
@@ -101,7 +151,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getDatabase, ref, push, onValue, update } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+        import { getDatabase, ref, push, onValue, update, set, get, child } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyBzAlFc53i183dYa56nDFqEROIrJIiBUsg",
@@ -117,6 +167,7 @@
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
 
+        let currentUser = null;
         let products = {};
         let cart = [];
         let currentTrackKey = null;
@@ -125,22 +176,99 @@
         let selectedRating = 5;
         let html5QrcodeScanner = null;
 
-        // Load Products
-        onValue(ref(db, 'products'), (snapshot) => {
-            const data = snapshot.val();
-            if(data) {
-                products = data;
-                renderStore();
+        window.switchAuthTab = function(tab) {
+            if(tab === 'login') {
+                document.getElementById('form-login').classList.remove('hidden');
+                document.getElementById('form-signup').classList.add('hidden');
+                document.getElementById('tab-login').className = "flex-1 pb-2 border-b-2 border-indigo-600 text-indigo-600 font-semibold";
+                document.getElementById('tab-signup').className = "flex-1 pb-2 text-slate-400 border-b-2 border-transparent";
             } else {
-                // Default fallback if empty
-                products = {
-                    'p1': { name: "Latte & Croissant Combo", price: 15000, category: "Food & Cafe" },
-                    'p2': { name: "Fresh Grocery Bag", price: 45000, category: "Groceries" },
-                    'p3': { name: "USB-C Fast Charger", price: 28000, category: "Electronics" }
-                };
-                renderStore();
+                document.getElementById('form-signup').classList.remove('hidden');
+                document.getElementById('form-login').classList.add('hidden');
+                document.getElementById('tab-signup').className = "flex-1 pb-2 border-b-2 border-indigo-600 text-indigo-600 font-semibold";
+                document.getElementById('tab-login').className = "flex-1 pb-2 text-slate-400 border-b-2 border-transparent";
             }
-        });
+        }
+
+        window.signupCustomer = function() {
+            const name = document.getElementById('signup-name').value.trim();
+            const phone = document.getElementById('signup-phone').value.trim();
+            const email = document.getElementById('signup-email').value.trim().toLowerCase();
+            if(!name || !phone || !email) return alert('Please fill in all signup fields.');
+
+            const userKey = email.replace(/[.#$\/\[\]]/g, "_");
+            const userRef = ref(db, `customers/${userKey}`);
+
+            get(userRef).then((snapshot) => {
+                if(snapshot.exists()) {
+                    alert('An account with this email already exists. Please login.');
+                } else {
+                    set(userRef, { name, phone, email }).then(() => {
+                        loginSuccess({ name, phone, email });
+                    });
+                }
+            });
+        }
+
+        window.loginCustomer = function() {
+            const identifier = document.getElementById('login-identifier').value.trim().toLowerCase();
+            if(!identifier) return alert('Please enter your email or phone.');
+
+            const userKey = identifier.replace(/[.#$\/\[\]]/g, "_");
+            get(ref(db, `customers/${userKey}`)).then((snapshot) => {
+                if(snapshot.exists()) {
+                    loginSuccess(snapshot.val());
+                } else {
+                    // Try checking by phone or searching values
+                    get(ref(db, 'customers')).then((allSnap) => {
+                        let found = null;
+                        allSnap.forEach((childSnap) => {
+                            const u = childSnap.val();
+                            if(u.email === identifier || u.phone === identifier) found = u;
+                        });
+                        if(found) {
+                            loginSuccess(found);
+                        } else {
+                            alert('Account not found. Please register an account first.');
+                        }
+                    });
+                }
+            });
+        }
+
+        function loginSuccess(user) {
+            currentUser = user;
+            document.getElementById('auth-container').classList.add('hidden');
+            document.getElementById('store-main-container').classList.remove('hidden');
+            document.getElementById('user-profile-nav').classList.remove('hidden');
+            document.getElementById('nav-username').innerText = user.name;
+            loadProducts();
+        }
+
+        window.logoutCustomer = function() {
+            currentUser = null;
+            document.getElementById('auth-container').classList.remove('hidden');
+            document.getElementById('store-main-container').classList.add('hidden');
+            document.getElementById('user-profile-nav').classList.add('hidden');
+            cart = [];
+            renderCart();
+        }
+
+        function loadProducts() {
+            onValue(ref(db, 'products'), (snapshot) => {
+                const data = snapshot.val();
+                if(data) {
+                    products = data;
+                } else {
+                    products = {
+                        'p1': { name: "Latte & Croissant Combo", price: 15000, category: "Food & Cafe" },
+                        'p2': { name: "Fresh Grocery Bag", price: 45000, category: "Groceries" },
+                        'p3': { name: "USB-C Fast Charger", price: 28000, category: "Electronics" }
+                    };
+                }
+                renderStore();
+            });
+        }
 
         window.renderStore = function() {
             const container = document.getElementById('product-list');
@@ -190,16 +318,15 @@
 
         window.placeOrder = function() {
             if(cart.length === 0) return alert('Your cart is empty.');
-            const name = document.getElementById('cust-name').value.trim();
             const address = document.getElementById('cust-address').value.trim();
-            const phone = document.getElementById('cust-phone').value.trim();
-            if(!name || !address || !phone) return alert('Please fill in your name, delivery address, and phone number.');
+            if(!address) return alert('Please enter your delivery address.');
 
             const newOrderRef = push(ref(db, 'orders'));
             const orderData = {
-                customerName: name,
+                customerName: currentUser.name,
+                customerPhone: currentUser.phone,
+                customerEmail: currentUser.email,
                 customerAddress: address,
-                customerPhone: phone,
                 items: cart,
                 total: cart.reduce((sum, i) => sum + i.price, 0),
                 status: 'Unassigned',
@@ -208,19 +335,15 @@
                 createdAt: Date.now()
             };
 
-            setOrderData(newOrderRef, orderData);
-        }
-
-        function setOrderData(orderRef, orderData) {
             import("https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js").then(({ set }) => {
-                set(orderRef, orderData).then(() => {
-                    currentTrackKey = orderRef.key;
+                set(newOrderRef, orderData).then(() => {
+                    currentTrackKey = newOrderRef.key;
                     cart = [];
                     renderCart();
                     document.getElementById('active-order-badge').classList.remove('hidden');
                     document.getElementById('tracking-card').classList.remove('hidden');
                     document.getElementById('track-id').innerText = `ORD-${currentTrackKey.slice(-6).toUpperCase()}`;
-                    document.getElementById('track-dest').innerText = orderData.customerAddress;
+                    document.getElementById('track-dest').innerText = address;
 
                     onValue(ref(db, `orders/${currentTrackKey}`), (snapshot) => {
                         const data = snapshot.val();
@@ -238,7 +361,7 @@
                         }
                     });
                     alert('Order placed successfully!');
-                }).catch(err => alert('Error: ' + err.message));
+                });
             });
         }
 
