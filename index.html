@@ -16,16 +16,14 @@
     </header>
 
     <main class="max-w-6xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <!-- Store Catalog -->
         <div class="lg:col-span-2 space-y-6">
             <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
                 <h2 class="text-lg font-bold mb-4 text-slate-900">🛍️ Quick Order Store</h2>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4" id="product-list">
-                    <p class="text-slate-400 text-sm">Loading products...</p>
+                    <p class="text-slate-400 text-sm">Loading store inventory...</p>
                 </div>
             </div>
 
-            <!-- Custom Parcel Request -->
             <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
                 <h2 class="text-lg font-bold mb-4 text-slate-900">📮 Send Custom Parcel / Package</h2>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -42,7 +40,6 @@
             </div>
         </div>
 
-        <!-- Checkout & Live Tracking Sidebar -->
         <div class="space-y-6">
             <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
                 <h2 class="text-lg font-bold mb-4 text-slate-900">🛒 Your Delivery Cart</h2>
@@ -50,23 +47,13 @@
                     <p class="text-slate-400 py-2">Your cart is empty.</p>
                 </div>
                 <div class="border-t pt-4 space-y-3">
-                    <div>
-                        <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Your Name</label>
-                        <input type="text" id="cust-name" placeholder="Full Name" class="w-full px-3 py-2 border rounded-lg text-sm">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Delivery Address</label>
-                        <input type="text" id="cust-address" placeholder="Street, Building, Apartment" class="w-full px-3 py-2 border rounded-lg text-sm">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Phone Number</label>
-                        <input type="text" id="cust-phone" placeholder="+976 ..." class="w-full px-3 py-2 border rounded-lg text-sm">
-                    </div>
+                    <input type="text" id="cust-name" placeholder="Full Name" class="w-full px-3 py-2 border rounded-lg text-sm">
+                    <input type="text" id="cust-address" placeholder="Delivery Address" class="w-full px-3 py-2 border rounded-lg text-sm">
+                    <input type="text" id="cust-phone" placeholder="Phone Number" class="w-full px-3 py-2 border rounded-lg text-sm">
                     <button onclick="placeOrder()" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl hover:bg-indigo-700 transition">Place Delivery Order</button>
                 </div>
             </div>
 
-            <!-- Live Order Tracking & QR Completion Card -->
             <div id="tracking-card" class="hidden bg-gradient-to-br from-indigo-900 to-slate-900 text-white p-6 rounded-2xl shadow-lg space-y-4">
                 <div class="flex justify-between items-start">
                     <div>
@@ -88,22 +75,19 @@
         </div>
     </main>
 
-    <!-- QR Scanner & Rating Modal -->
     <div id="qr-modal" class="hidden fixed inset-0 bg-slate-950/80 z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 text-slate-900 shadow-xl">
             <div class="flex justify-between items-center">
                 <h3 class="font-bold text-lg">Scan Driver QR Code</h3>
                 <button onclick="closeScannerModal()" class="text-slate-400 hover:text-slate-600 font-bold">✕</button>
             </div>
-            
             <div id="reader" class="w-full rounded-xl overflow-hidden bg-slate-100"></div>
-
             <div id="rating-section" class="hidden space-y-3 pt-2 border-t">
                 <div class="text-center">
                     <p class="font-semibold text-sm text-emerald-600">✓ Driver Verified: <span id="scanned-driver-name"></span></p>
                     <p class="text-xs text-slate-500 mt-1">Please rate your delivery experience:</p>
                 </div>
-                <div class="flex justify-center gap-2 text-3xl cursor-pointer" id="star-container">
+                <div class="flex justify-center gap-2 text-3xl cursor-pointer">
                     <span onclick="setRating(1)" class="star text-slate-300 hover:text-amber-400">★</span>
                     <span onclick="setRating(2)" class="star text-slate-300 hover:text-amber-400">★</span>
                     <span onclick="setRating(3)" class="star text-slate-300 hover:text-amber-400">★</span>
@@ -115,14 +99,14 @@
         </div>
     </div>
 
-    <!-- Firebase SDKs & Logic -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, collection, addDoc, doc, onSnapshot, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getDatabase, ref, push, onValue, update } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyBzAlFc53i183dYa56nDFqEROIrJIiBUsg",
             authDomain: "delivery88-fffbf.firebaseapp.com",
+            databaseURL: "https://delivery88-fffbf-default-rtdb.firebaseio.com",
             projectId: "delivery88-fffbf",
             storageBucket: "delivery88-fffbf.firebasestorage.app",
             messagingSenderId: "562400768958",
@@ -131,51 +115,51 @@
         };
 
         const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
+        const db = getDatabase(app);
 
-        let products = [];
+        let products = {};
         let cart = [];
-        let currentTrackId = null;
+        let currentTrackKey = null;
         let assignedDriverId = null;
         let assignedDriverName = '';
         let selectedRating = 5;
         let html5QrcodeScanner = null;
-        let unsubscribeTracker = null;
 
-        // Listen for products from Firestore so store updates when dispatcher adds items
-        onSnapshot(collection(db, "products"), (snapshot) => {
-            const fetchedProducts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            if(fetchedProducts.length > 0) {
-                products = fetchedProducts;
+        // Load Products
+        onValue(ref(db, 'products'), (snapshot) => {
+            const data = snapshot.val();
+            if(data) {
+                products = data;
+                renderStore();
             } else {
-                // Fallback default products if none in Firestore
-                products = [
-                    { id: '1', name: "Latte & Croissant Combo", price: 15000, category: "Food & Cafe" },
-                    { id: '2', name: "Fresh Grocery Bag", price: 45000, category: "Groceries" },
-                    { id: '3', name: "USB-C Fast Charger", price: 28000, category: "Electronics" }
-                ];
+                // Default fallback if empty
+                products = {
+                    'p1': { name: "Latte & Croissant Combo", price: 15000, category: "Food & Cafe" },
+                    'p2': { name: "Fresh Grocery Bag", price: 45000, category: "Groceries" },
+                    'p3': { name: "USB-C Fast Charger", price: 28000, category: "Electronics" }
+                };
+                renderStore();
             }
-            renderStore();
         });
 
         window.renderStore = function() {
             const container = document.getElementById('product-list');
-            container.innerHTML = products.map(p => `
+            container.innerHTML = Object.entries(products).map(([id, p]) => `
                 <div class="border border-slate-200 p-4 rounded-xl flex flex-col justify-between hover:border-indigo-300 transition">
                     <div>
                         <span class="text-xs font-semibold text-indigo-600 uppercase">${p.category || 'General'}</span>
                         <h3 class="font-bold text-slate-900 mt-1">${p.name}</h3>
                         <p class="text-slate-600 text-sm mt-1">₮${Number(p.price).toLocaleString()}</p>
                     </div>
-                    <button onclick="addToCart('${p.id}')" class="mt-4 bg-slate-100 hover:bg-indigo-600 hover:text-white text-slate-800 font-medium py-2 rounded-lg text-sm transition">Add to Cart</button>
+                    <button onclick="addToCart('${id}')" class="mt-4 bg-slate-100 hover:bg-indigo-600 hover:text-white text-slate-800 font-medium py-2 rounded-lg text-sm transition">Add to Cart</button>
                 </div>
             `).join('');
         }
 
-        window.addToCart = function(productId) {
-            const product = products.find(p => p.id == productId);
-            if(product) {
-                cart.push({ name: product.name, price: Number(product.price), category: product.category || 'General' });
+        window.addToCart = function(id) {
+            const p = products[id];
+            if(p) {
+                cart.push({ name: p.name, price: Number(p.price), category: p.category || 'General' });
                 renderCart();
             }
         }
@@ -192,33 +176,26 @@
 
         window.renderCart = function() {
             const container = document.getElementById('cart-items');
-            if(cart.length === 0) {
-                container.innerHTML = `<p class="text-slate-400 py-2">Your cart is empty.</p>`;
-                return;
-            }
+            if(cart.length === 0) return container.innerHTML = `<p class="text-slate-400 py-2">Your cart is empty.</p>`;
             container.innerHTML = cart.map((item, idx) => `
                 <div class="py-2.5 flex justify-between items-center text-sm">
                     <div>
                         <p class="font-medium text-slate-800">${item.name}</p>
                         <p class="text-xs text-slate-500">₮${Number(item.price).toLocaleString()}</p>
                     </div>
-                    <button onclick="removeFromCart(${idx})" class="text-red-500 hover:text-red-700 font-bold text-xs">Remove</button>
+                    <button onclick="cart.splice(${idx},1);renderCart()" class="text-red-500 hover:text-red-700 font-bold text-xs">Remove</button>
                 </div>
             `).join('');
         }
 
-        window.removeFromCart = function(index) {
-            cart.splice(index, 1);
-            renderCart();
-        }
-
-        window.placeOrder = async function() {
+        window.placeOrder = function() {
             if(cart.length === 0) return alert('Your cart is empty.');
             const name = document.getElementById('cust-name').value.trim();
             const address = document.getElementById('cust-address').value.trim();
             const phone = document.getElementById('cust-phone').value.trim();
             if(!name || !address || !phone) return alert('Please fill in your name, delivery address, and phone number.');
 
+            const newOrderRef = push(ref(db, 'orders'));
             const orderData = {
                 customerName: name,
                 customerAddress: address,
@@ -226,42 +203,43 @@
                 items: cart,
                 total: cart.reduce((sum, i) => sum + i.price, 0),
                 status: 'Unassigned',
-                driverId: null,
+                driverId: '',
                 driverName: 'Unassigned',
-                createdAt: serverTimestamp()
+                createdAt: Date.now()
             };
 
-            try {
-                const docRef = await addDoc(collection(db, "orders"), orderData);
-                currentTrackId = docRef.id;
-                cart = [];
-                renderCart();
-                document.getElementById('active-order-badge').classList.remove('hidden');
-                document.getElementById('tracking-card').classList.remove('hidden');
-                document.getElementById('track-id').innerText = `ORD-${docRef.id.slice(-6).toUpperCase()}`;
-                document.getElementById('track-dest').innerText = address;
+            setOrderData(newOrderRef, orderData);
+        }
 
-                if(unsubscribeTracker) unsubscribeTracker();
-                unsubscribeTracker = onSnapshot(doc(db, "orders", docRef.id), (docSnap) => {
-                    if(!docSnap.exists()) return;
-                    const data = docSnap.data();
-                    document.getElementById('track-status').innerText = data.status;
-                    document.getElementById('track-driver').innerText = data.driverName || 'Unassigned';
-                    assignedDriverId = data.driverId;
-                    assignedDriverName = data.driverName;
+        function setOrderData(orderRef, orderData) {
+            import("https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js").then(({ set }) => {
+                set(orderRef, orderData).then(() => {
+                    currentTrackKey = orderRef.key;
+                    cart = [];
+                    renderCart();
+                    document.getElementById('active-order-badge').classList.remove('hidden');
+                    document.getElementById('tracking-card').classList.remove('hidden');
+                    document.getElementById('track-id').innerText = `ORD-${currentTrackKey.slice(-6).toUpperCase()}`;
+                    document.getElementById('track-dest').innerText = orderData.customerAddress;
 
-                    if(data.status === 'Picked Up' || data.status === 'Assigned') {
-                        document.getElementById('scan-action-box').classList.remove('hidden');
-                    }
-                    if(data.status === 'Delivered') {
-                        document.getElementById('scan-action-box').classList.add('hidden');
-                    }
-                });
-                alert('Order placed successfully!');
-            } catch(e) {
-                console.error("Order placement error:", e);
-                alert('Error placing order: ' + e.message);
-            }
+                    onValue(ref(db, `orders/${currentTrackKey}`), (snapshot) => {
+                        const data = snapshot.val();
+                        if(!data) return;
+                        document.getElementById('track-status').innerText = data.status;
+                        document.getElementById('track-driver').innerText = data.driverName || 'Unassigned';
+                        assignedDriverId = data.driverId;
+                        assignedDriverName = data.driverName;
+
+                        if(data.status === 'Picked Up' || data.status === 'Assigned') {
+                            document.getElementById('scan-action-box').classList.remove('hidden');
+                        }
+                        if(data.status === 'Delivered') {
+                            document.getElementById('scan-action-box').classList.add('hidden');
+                        }
+                    });
+                    alert('Order placed successfully!');
+                }).catch(err => alert('Error: ' + err.message));
+            });
         }
 
         window.openScannerModal = function() {
@@ -274,13 +252,13 @@
                     document.getElementById('scanned-driver-name').innerText = assignedDriverName;
                     document.getElementById('rating-section').classList.remove('hidden');
                 } else {
-                    alert('Invalid driver QR code. Please scan the assigned courier’s QR code.');
+                    alert('Invalid driver QR code.');
                 }
-            }, (error) => {});
+            }, () => {});
         }
 
         window.closeScannerModal = function() {
-            if(html5QrcodeScanner) html5QrcodeScanner.clear().catch(e => {});
+            if(html5QrcodeScanner) html5QrcodeScanner.clear().catch(() => {});
             document.getElementById('qr-modal').classList.add('hidden');
             document.getElementById('reader').style.display = 'block';
             document.getElementById('rating-section').classList.add('hidden');
@@ -288,19 +266,19 @@
 
         window.setRating = function(stars) {
             selectedRating = stars;
-            const starsEls = document.querySelectorAll('.star');
-            starsEls.forEach((el, idx) => {
+            document.querySelectorAll('.star').forEach((el, idx) => {
                 el.style.color = idx < stars ? '#f59e0b' : '#cbd5e1';
             });
         }
 
-        window.submitCompletion = async function() {
-            await updateDoc(doc(db, "orders", currentTrackId), {
+        window.submitCompletion = function() {
+            update(ref(db, `orders/${currentTrackKey}`), {
                 status: 'Delivered',
                 rating: selectedRating
+            }).then(() => {
+                closeScannerModal();
+                alert(`Thank you! Completed with a ${selectedRating}-star rating.`);
             });
-            closeScannerModal();
-            alert(`Thank you! Delivered successfully with a ${selectedRating}-star rating.`);
         }
     </script>
 </body>
