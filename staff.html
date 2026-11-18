@@ -8,42 +8,83 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen">
+    <!-- Header -->
     <header class="bg-slate-900 text-white shadow-md sticky top-0 z-50">
         <div class="max-w-4xl mx-auto px-4 py-4 flex justify-between items-center">
-            <h1 class="text-xl font-bold">🏍️ Courier Portal</h1>
-            <select id="courier-session-select" onchange="switchCourierSession()" class="bg-slate-800 text-white border border-slate-700 text-xs px-3 py-1.5 rounded-lg font-medium">
-                <option value="">Select Your Name...</option>
-            </select>
+            <h1 class="text-xl font-bold flex items-center gap-2">🏍️ Courier Portal</h1>
+            <div id="driver-profile-nav" class="hidden items-center gap-3 text-sm">
+                <span>👤 <strong id="nav-drivername">Courier</strong></span>
+                <button onclick="logoutDriver()" class="text-xs text-slate-400 hover:text-white underline">Logout</button>
+            </div>
         </div>
     </header>
 
-    <main class="max-w-4xl mx-auto px-4 py-8 space-y-6">
-        <div id="login-prompt" class="bg-indigo-50 border border-indigo-200 p-6 rounded-2xl text-center">
-            <h2 class="text-lg font-bold text-indigo-900 mb-1">Welcome to Courier Mode</h2>
-            <p class="text-sm text-indigo-700">Please select your courier profile from the top right dropdown menu.</p>
+    <!-- Courier Login / Signup View -->
+    <div id="auth-container" class="max-w-md mx-auto mt-16 bg-white p-8 rounded-2xl shadow-sm border border-slate-200 space-y-6">
+        <div class="text-center">
+            <h2 class="text-2xl font-bold text-slate-900">Courier Portal Sign In</h2>
+            <p class="text-xs text-slate-500 mt-1">Access your assigned routes & delivery QR code</p>
         </div>
 
-        <div id="courier-dashboard" class="hidden grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 text-center space-y-4">
-                <h3 class="font-bold text-slate-900 text-lg" id="driver-profile-name">-</h3>
-                <span class="inline-block bg-emerald-100 text-emerald-800 text-xs px-3 py-1 rounded-full font-bold">On Duty</span>
-                <div class="bg-slate-50 p-4 rounded-xl flex flex-col items-center justify-center space-y-2">
-                    <p class="text-xs text-slate-500 font-semibold uppercase">Your Delivery QR</p>
-                    <div id="qrcode" class="bg-white p-2 rounded-lg border flex justify-center"></div>
-                    <p class="text-[10px] text-slate-400">Customer scans this upon delivery</p>
-                </div>
-            </div>
+        <!-- Tabs -->
+        <div class="flex border-b text-sm font-semibold">
+            <button onclick="switchAuthTab('login')" id="tab-login" class="flex-1 pb-2 border-b-2 border-indigo-600 text-indigo-600">Login</button>
+            <button onclick="switchAuthTab('signup')" id="tab-signup" class="flex-1 pb-2 text-slate-400 border-b-2 border-transparent">Register Courier</button>
+        </div>
 
-            <div class="md:col-span-2 space-y-4">
-                <h2 class="text-lg font-bold text-slate-900">📋 Assigned Deliveries</h2>
-                <div id="task-list" class="space-y-4"></div>
+        <!-- Login Form -->
+        <div id="form-login" class="space-y-4">
+            <div>
+                <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Email or Phone</label>
+                <input type="text" id="login-identifier" placeholder="Enter your email or phone" class="w-full px-3 py-2 border rounded-lg text-sm">
+            </div>
+            <button onclick="loginDriver()" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-2.5 rounded-xl text-sm transition">Sign In as Courier</button>
+        </div>
+
+        <!-- Signup Form -->
+        <div id="form-signup" class="space-y-4 hidden">
+            <div>
+                <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Full Name</label>
+                <input type="text" id="signup-name" placeholder="Alex Rivera" class="w-full px-3 py-2 border rounded-lg text-sm">
+            </div>
+            <div>
+                <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Phone Number</label>
+                <input type="text" id="signup-phone" placeholder="+976 ..." class="w-full px-3 py-2 border rounded-lg text-sm">
+            </div>
+            <div>
+                <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Email (Login ID)</label>
+                <input type="email" id="signup-email" placeholder="alex@swiftroute.com" class="w-full px-3 py-2 border rounded-lg text-sm">
+            </div>
+            <button onclick="signupDriver()" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-2.5 rounded-xl text-sm transition">Register & Go Online</button>
+        </div>
+    </div>
+
+    <!-- Main Courier Dashboard (Hidden until logged in) -->
+    <main id="dashboard-container" class="hidden max-w-4xl mx-auto px-4 py-8 grid grid-cols-1 md:grid-cols-3 gap-6">
+        <!-- Profile & QR Code Card -->
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 text-center space-y-4">
+            <h3 class="font-bold text-slate-900 text-lg" id="driver-display-name">-</h3>
+            <span class="inline-block bg-emerald-100 text-emerald-800 text-xs px-3 py-1 rounded-full font-bold">Online & Ready</span>
+            <div class="bg-slate-50 p-4 rounded-xl flex flex-col items-center justify-center space-y-2">
+                <p class="text-xs text-slate-500 font-semibold uppercase">Your Delivery QR</p>
+                <div id="qrcode" class="bg-white p-2 rounded-lg border flex justify-center"></div>
+                <p class="text-[10px] text-slate-400">Customer scans this upon delivery</p>
+            </div>
+        </div>
+
+        <!-- Assigned Deliveries -->
+        <div class="md:col-span-2 space-y-4">
+            <h2 class="text-lg font-bold text-slate-900">📋 Assigned Deliveries</h2>
+            <div id="task-list" class="space-y-4">
+                <p class="text-slate-400 text-sm">Loading assigned deliveries...</p>
             </div>
         </div>
     </main>
 
+    <!-- Firebase SDKs & Logic -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+        import { getDatabase, ref, push, onValue, update, set, get } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyBzAlFc53i183dYa56nDFqEROIrJIiBUsg",
@@ -59,51 +100,111 @@
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
 
-        let drivers = {};
+        let currentDriverKey = null;
+        let currentDriverData = null;
         let orders = {};
-        let currentCourierId = null;
 
-        onValue(ref(db, 'drivers'), (snapshot) => {
-            drivers = snapshot.val() || {};
-            const select = document.getElementById('courier-session-select');
-            const val = select.value;
-            select.innerHTML = `<option value="">Select Your Name...</option>` + Object.entries(drivers).map(([id, d]) => `<option value="${id}">${d.name}</option>`).join('');
-            if(val) select.value = val;
-        });
-
-        onValue(ref(db, 'orders'), (snapshot) => {
-            orders = snapshot.val() || {};
-            renderTasks();
-        });
-
-        window.switchCourierSession = function() {
-            currentCourierId = document.getElementById('courier-session-select').value;
-            const driver = drivers[currentCourierId];
-
-            if(currentCourierId && driver) {
-                document.getElementById('login-prompt').classList.add('hidden');
-                document.getElementById('courier-dashboard').classList.remove('hidden');
-                document.getElementById('driver-profile-name').innerText = driver.name;
-
-                document.getElementById('qrcode').innerHTML = "";
-                new QRCode(document.getElementById("qrcode"), {
-                    text: `DRIVER_ID:${currentCourierId}:${driver.name}`,
-                    width: 140,
-                    height: 140
-                });
+        window.switchAuthTab = function(tab) {
+            if(tab === 'login') {
+                document.getElementById('form-login').classList.remove('hidden');
+                document.getElementById('form-signup').classList.add('hidden');
+                document.getElementById('tab-login').className = "flex-1 pb-2 border-b-2 border-indigo-600 text-indigo-600 font-semibold";
+                document.getElementById('tab-signup').className = "flex-1 pb-2 text-slate-400 border-b-2 border-transparent";
             } else {
-                document.getElementById('login-prompt').classList.remove('hidden');
-                document.getElementById('courier-dashboard').classList.add('hidden');
+                document.getElementById('form-signup').classList.remove('hidden');
+                document.getElementById('form-login').classList.add('hidden');
+                document.getElementById('tab-signup').className = "flex-1 pb-2 border-b-2 border-indigo-600 text-indigo-600 font-semibold";
+                document.getElementById('tab-login').className = "flex-1 pb-2 text-slate-400 border-b-2 border-transparent";
             }
-            renderTasks();
+        }
+
+        window.signupDriver = function() {
+            const name = document.getElementById('signup-name').value.trim();
+            const phone = document.getElementById('signup-phone').value.trim();
+            const email = document.getElementById('signup-email').value.trim().toLowerCase();
+            if(!name || !phone || !email) return alert('Please fill in all courier registration fields.');
+
+            const newDriverRef = push(ref(db, 'drivers'));
+            const driverData = { name, phone, email, status: 'Online' };
+
+            set(newDriverRef, driverData).then(() => {
+                loginSuccess(newDriverRef.key, driverData);
+            }).catch(e => alert('Error registering: ' + e.message));
+        }
+
+        window.loginDriver = function() {
+            const identifier = document.getElementById('login-identifier').value.trim().toLowerCase();
+            if(!identifier) return alert('Please enter your email or phone.');
+
+            get(ref(db, 'drivers')).then((snapshot) => {
+                if(!snapshot.exists()) return alert('No courier accounts found. Please register.');
+                let foundKey = null;
+                let foundData = null;
+
+                snapshot.forEach((childSnap) => {
+                    const d = childSnap.val();
+                    if(d.email === identifier || d.phone === identifier || d.name.toLowerCase() === identifier) {
+                        foundKey = childSnap.key;
+                        foundData = d;
+                    }
+                });
+
+                if(foundKey && foundData) {
+                    // Ensure driver is marked online upon login
+                    update(ref(db, `drivers/${foundKey}`), { status: 'Online' });
+                    loginSuccess(foundKey, { ...foundData, status: 'Online' });
+                } else {
+                    alert('Courier account not found. Please register first.');
+                }
+            });
+        }
+
+        function loginSuccess(key, driver) {
+            currentDriverKey = key;
+            currentDriverData = driver;
+            document.getElementById('auth-container').classList.add('hidden');
+            document.getElementById('dashboard-container').classList.remove('hidden');
+            document.getElementById('driver-profile-nav').classList.remove('hidden');
+            document.getElementById('nav-drivername').innerText = driver.name;
+            document.getElementById('driver-display-name').innerText = driver.name;
+
+            // Generate Personal QR Code
+            document.getElementById('qrcode').innerHTML = "";
+            new QRCode(document.getElementById("qrcode"), {
+                text: `DRIVER_ID:${currentDriverKey}:${driver.name}`,
+                width: 140,
+                height: 140
+            });
+
+            startListeningOrders();
+        }
+
+        window.logoutDriver = function() {
+            if(currentDriverKey) {
+                update(ref(db, `drivers/${currentDriverKey}`), { status: 'Offline' });
+            }
+            currentDriverKey = null;
+            currentDriverData = null;
+            document.getElementById('auth-container').classList.remove('hidden');
+            document.getElementById('dashboard-container').classList.add('hidden');
+            document.getElementById('driver-profile-nav').classList.add('hidden');
+        }
+
+        function startListeningOrders() {
+            onValue(ref(db, 'orders'), (snapshot) => {
+                orders = snapshot.val() || {};
+                renderTasks();
+            });
         }
 
         window.renderTasks = function() {
-            if(!currentCourierId) return;
+            if(!currentDriverKey) return;
             const container = document.getElementById('task-list');
-            const myOrders = Object.entries(orders).filter(([_, o]) => o.driverId === currentCourierId && o.status !== 'Delivered');
+            const myOrders = Object.entries(orders).filter(([_, o]) => o.driverId === currentDriverKey && o.status !== 'Delivered');
 
-            if(myOrders.length === 0) return container.innerHTML = `<div class="bg-white p-6 rounded-2xl border text-center text-slate-500 text-sm">No active delivery tasks assigned to you.</div>`;
+            if(myOrders.length === 0) {
+                return container.innerHTML = `<div class="bg-white p-6 rounded-2xl border text-center text-slate-500 text-sm">No active delivery tasks assigned to you right now.</div>`;
+            }
 
             container.innerHTML = myOrders.map(([id, o]) => `
                 <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-3">
@@ -116,11 +217,11 @@
                         <span class="px-2.5 py-1 rounded-full text-xs font-bold ${o.status === 'Assigned' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}">${o.status}</span>
                     </div>
                     <div class="bg-slate-50 p-3 rounded-xl text-xs space-y-1">
-                        <p>📍 <strong>Address:</strong> ${o.customerAddress}</p>
-                        <p>💰 <strong>Total:</strong> ₮${o.total?.toLocaleString()}</p>
+                        <p>📍 <strong>Delivery Address:</strong> ${o.customerAddress}</p>
+                        <p>💰 <strong>Total Amount:</strong> ₮${o.total?.toLocaleString()}</p>
                     </div>
                     ${o.status === 'Assigned' ? `
-                        <button onclick="updateStatus('${id}', 'Picked Up')" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 rounded-xl text-xs">Confirm Pickup from Merchant</button>
+                        <button onclick="updateStatus('${id}', 'Picked Up')" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 rounded-xl text-xs transition">Confirm Pickup from Merchant</button>
                     ` : `<p class="text-xs text-center text-indigo-600 font-semibold italic">En route! Ask customer to scan your QR code upon delivery.</p>`}
                 </div>
             `).join('');
