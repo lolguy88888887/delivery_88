@@ -3,155 +3,270 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SwiftRoute | Customer Storefront</title>
+    <title>SwiftRoute | Customer Storefront & Mobile Wallet</title>
+    <!-- External Libraries for Barcode, QR Code & Camera Scanning -->
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+
+    <style>
+        :root {
+            --primary: #3b82f6;
+            --primary-dark: #1d4ed8;
+            --success: #22c55e;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --info: #06b6d4;
+            --dark-bg: #0f172a;
+            --card-bg: #1e293b;
+            --card-border: #334155;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --sidebar-width: 260px;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, sans-serif; }
+        body { background-color: var(--dark-bg); color: var(--text-main); display: flex; justify-content: center; min-height: 100vh; padding: 15px; position: relative; overflow-x: hidden; }
+
+        .app-container { width: 100%; max-width: 440px; display: flex; flex-direction: column; gap: 16px; position: relative; }
+
+        .sidebar-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.6); display: none; z-index: 1000; }
+        .sidebar { position: fixed; top: 0; left: -260px; width: var(--sidebar-width); height: 100%; background: var(--card-bg); border-right: 1px solid var(--card-border); z-index: 1001; transition: left 0.3s ease; display: flex; flex-direction: column; padding: 20px 15px; box-shadow: 4px 0 15px rgba(0,0,0,0.5); }
+        .sidebar.active { left: 0; }
+        .sidebar-overlay.active { display: block; }
+
+        .sidebar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid var(--card-border); }
+        .sidebar-title { font-weight: 700; font-size: 1.1rem; color: var(--primary); }
+        .close-sidebar-btn { background: none; border: none; color: var(--text-muted); font-size: 1.2rem; cursor: pointer; }
+
+        .nav-list { display: flex; flex-direction: column; gap: 6px; flex: 1; }
+        .nav-item { display: flex; align-items: center; gap: 12px; padding: 12px 15px; border-radius: 10px; color: var(--text-main); text-decoration: none; font-weight: 600; font-size: 0.9rem; cursor: pointer; transition: background 0.2s; }
+        .nav-item:hover, .nav-item.active { background: #334155; color: var(--primary); }
+
+        .header-bar { display: flex; justify-content: space-between; align-items: center; background: var(--card-bg); padding: 10px 15px; border-radius: 12px; border: 1px solid var(--card-border); font-size: 0.85rem; }
+        .menu-btn { background: none; border: none; color: var(--text-main); font-size: 1.3rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+
+        .page-view { display: none; flex-direction: column; gap: 16px; animation: fadeIn 0.2s ease-in-out; }
+        .page-view.active-page { display: flex; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+        .page-card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 20px; padding: 20px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.4); }
+        .page-title { font-size: 1.05rem; font-weight: 700; color: var(--text-main); margin-bottom: 15px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+        .input-field { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid var(--card-border); background: #0f172a; color: white; font-size: 0.95rem; text-align: center; outline: none; }
+        .input-field:focus { border-color: var(--primary); }
+
+        .balance-card { background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); border-radius: 20px; padding: 20px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.4); }
+        .balance-title { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1.5px; color: #93c5fd; font-weight: 600; }
+        .balance-amount { font-size: 2.2rem; font-weight: 800; margin: 6px 0; color: white; }
+        .user-name { font-size: 0.95rem; opacity: 0.9; font-weight: 600; color: #e0f2fe; }
+        .account-id-badge { font-size: 0.75rem; color: #93c5fd; background: rgba(0,0,0,0.2); padding: 3px 8px; border-radius: 10px; display: inline-block; margin-top: 4px; }
+
+        .btn { padding: 12px; border: none; border-radius: 12px; font-weight: 700; cursor: pointer; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px; transition: transform 0.1s, background-color 0.2s; display: flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+        .btn:active { transform: scale(0.98); }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-success { background: var(--success); color: white; }
+        .btn-warning { background: var(--warning); color: #000; }
+        .btn-danger { background: var(--danger); color: white; }
+
+        .code-wrapper { background: white; padding: 12px; border-radius: 12px; display: inline-block; width: 100%; margin: 10px 0; }
+        .qr-wrapper { display: flex; justify-content: center; background: white; padding: 12px; border-radius: 12px; margin: 10px auto; width: max-content; }
+
+        .receipt-list { display: flex; flex-direction: column; gap: 10px; max-height: 400px; overflow-y: auto; text-align: left; }
+        .receipt-card { background: #0f172a; border: 1px solid var(--card-border); border-left: 4px solid var(--success); border-radius: 12px; padding: 12px; cursor: pointer; transition: transform 0.1s, border-color 0.2s; }
+        .receipt-card:hover { border-color: var(--primary); transform: translateY(-2px); }
+        .receipt-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+        .receipt-id { font-family: monospace; font-size: 0.75rem; color: #38bdf8; }
+        .receipt-total { font-size: 1rem; font-weight: 800; color: var(--success); }
+        .receipt-date { font-size: 0.7rem; color: var(--text-muted); }
+        .receipt-items-preview { font-size: 0.75rem; color: #cbd5e1; margin-top: 4px; border-top: 1px dashed #334155; padding-top: 4px; }
+
+        #reader { width: 100%; border-radius: 12px; overflow: hidden; background: black; min-height: 250px; }
+
+        .modal-backdrop { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.85); display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 9999; padding: 20px; }
+        .modal-box { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 20px; width: 100%; max-width: 380px; padding: 20px; text-align: center; position: relative; }
+        
+        #toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #334155; color: white; padding: 10px 18px; border-radius: 30px; border: 1px solid #475569; font-weight: bold; display: none; z-index: 10000; box-shadow: 0 8px 16px rgba(0,0,0,0.4); text-align: center; width: 90%; max-width: 330px; font-size: 0.85rem; }
+    </style>
 </head>
-<body class="bg-slate-50 text-slate-800 min-h-screen">
-    <!-- Header -->
-    <header class="bg-indigo-600 text-white shadow-md sticky top-0 z-50">
-        <div class="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
-            <h1 class="text-xl font-bold flex items-center gap-2">📦 SwiftRoute Express</h1>
-            <div class="flex items-center gap-3">
-                <span id="active-order-badge" class="hidden bg-amber-400 text-slate-900 text-xs font-bold px-3 py-1 rounded-full animate-pulse">Active Order Track</span>
-                <div id="user-profile-nav" class="hidden items-center gap-2 text-sm bg-indigo-700 px-3 py-1.5 rounded-xl">
-                    <span>👤 <strong id="nav-username">User</strong></span>
-                    <button onclick="logoutCustomer()" class="text-xs text-indigo-200 hover:text-white underline ml-2">Logout</button>
-                </div>
-            </div>
-        </div>
-    </header>
+<body>
 
-    <!-- Login / Signup Modal / View -->
-    <div id="auth-container" class="max-w-md mx-auto mt-16 bg-white p-8 rounded-2xl shadow-sm border border-slate-200 space-y-6">
-        <div class="text-center">
-            <h2 class="text-2xl font-bold text-slate-900">Welcome to SwiftRoute</h2>
-            <p class="text-xs text-slate-500 mt-1">Sign in or create an account to start ordering</p>
+    <div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleSidebar()"></div>
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-title">☰ Navigation</div>
+            <button class="close-sidebar-btn" onclick="toggleSidebar()">✕</button>
         </div>
-
-        <!-- Tabs -->
-        <div class="flex border-b text-sm font-semibold">
-            <button onclick="switchAuthTab('login')" id="tab-login" class="flex-1 pb-2 border-b-2 border-indigo-600 text-indigo-600">Login</button>
-            <button onclick="switchAuthTab('signup')" id="tab-signup" class="flex-1 pb-2 text-slate-400 border-b-2 border-transparent">Create Account</button>
+        <div class="nav-list">
+            <div class="nav-item" onclick="navigateToPage('dashboard-page')"><span>💰</span> Wallet Balance</div>
+            <div class="nav-item" onclick="navigateToPage('store-page')"><span>🛍️</span> Quick Store</div>
+            <div class="nav-item" onclick="navigateToPage('receipts-page')"><span>🧾</span> Digital Receipts</div>
+            <div class="nav-item" onclick="navigateToPage('transfer-page')"><span>💸</span> Transfer Money</div>
+            <div class="nav-item" onclick="navigateToPage('payment-page')"><span>💳</span> My QR & Barcode</div>
+            <div class="nav-item" onclick="navigateToPage('scan-page')"><span>📷</span> Scan Driver QR</div>
+            <div class="nav-item" onclick="navigateToPage('pin-settings-page')"><span>🔐</span> Change PIN</div>
         </div>
-
-        <!-- Login Form -->
-        <div id="form-login" class="space-y-4">
-            <div>
-                <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Email or Phone</label>
-                <input type="text" id="login-identifier" placeholder="Enter your email or phone" class="w-full px-3 py-2 border rounded-lg text-sm">
-            </div>
-            <button onclick="loginCustomer()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl text-sm transition">Sign In</button>
-        </div>
-
-        <!-- Signup Form -->
-        <div id="form-signup" class="space-y-4 hidden">
-            <div>
-                <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Full Name</label>
-                <input type="text" id="signup-name" placeholder="John Doe" class="w-full px-3 py-2 border rounded-lg text-sm">
-            </div>
-            <div>
-                <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Phone Number</label>
-                <input type="text" id="signup-phone" placeholder="+976 ..." class="w-full px-3 py-2 border rounded-lg text-sm">
-            </div>
-            <div>
-                <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Email (Login ID)</label>
-                <input type="email" id="signup-email" placeholder="your@email.com" class="w-full px-3 py-2 border rounded-lg text-sm">
-            </div>
-            <button onclick="signupCustomer()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl text-sm transition">Register Account</button>
-        </div>
+        <button class="btn btn-danger" style="width: 100%; margin-top: auto;" onclick="handleLogout()">Logout</button>
     </div>
 
-    <!-- Main Storefront (Hidden until logged in) -->
-    <main id="store-main-container" class="hidden max-w-6xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div class="lg:col-span-2 space-y-6">
-            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-                <h2 class="text-lg font-bold mb-4 text-slate-900">🛍️ Quick Order Store</h2>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4" id="product-list">
-                    <p class="text-slate-400 text-sm">Loading store inventory...</p>
-                </div>
-            </div>
-
-            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-                <h2 class="text-lg font-bold mb-4 text-slate-900">📮 Send Custom Parcel / Package</h2>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Pickup Address</label>
-                        <input type="text" id="custom-pickup" placeholder="e.g. Home, Office, Store" class="w-full px-3 py-2 border rounded-lg text-sm">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Package Description</label>
-                        <input type="text" id="custom-desc" placeholder="e.g. Documents, Box of clothes" class="w-full px-3 py-2 border rounded-lg text-sm">
-                    </div>
-                </div>
-                <button onclick="addCustomParcel()" class="mt-4 bg-slate-900 text-white font-semibold px-4 py-2 rounded-lg text-sm hover:bg-slate-800">Add Parcel to Cart</button>
+    <div class="app-container">
+        <!-- LOGIN PAGE -->
+        <div class="page-view" id="login-page">
+            <div class="page-card" style="display: flex; flex-direction: column; gap: 14px; margin-top: 40px;">
+                <div style="font-size: 1.3rem; font-weight: 700;">📦 SwiftRoute & Wallet</div>
+                <input type="text" id="login-account-id" class="input-field" placeholder="Account ID (e.g. 10011)">
+                <input type="password" id="login-passcode" class="input-field" placeholder="Passcode (123456)" maxlength="12">
+                <button class="btn btn-primary" onclick="handleLogin()">LOGIN</button>
+                <button class="btn btn-success" onclick="seedDatabase()">🌱 Seed Test Account (10011)</button>
             </div>
         </div>
 
-        <div class="space-y-6">
-            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-                <h2 class="text-lg font-bold mb-4 text-slate-900">🛒 Your Delivery Cart</h2>
-                <div id="cart-items" class="divide-y max-h-48 overflow-y-auto mb-4 text-sm">
-                    <p class="text-slate-400 py-2">Your cart is empty.</p>
-                </div>
-                <div class="border-t pt-4 space-y-3">
-                    <div>
-                        <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Delivery Address</label>
-                        <input type="text" id="cust-address" placeholder="Street, Building, Apartment" class="w-full px-3 py-2 border rounded-lg text-sm">
-                    </div>
-                    <button onclick="placeOrder()" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl hover:bg-indigo-700 transition">Place Delivery Order</button>
-                </div>
-            </div>
+        <!-- HEADER BAR -->
+        <div class="header-bar" id="app-header" style="display: none;">
+            <button class="menu-btn" onclick="toggleSidebar()">☰</button>
+            <span id="header-user-display" style="font-weight: 600;">User</span>
+            <button class="btn btn-danger" style="padding: 5px 10px; font-size: 0.7rem;" onclick="handleLogout()">Logout</button>
+        </div>
 
-            <div id="tracking-card" class="hidden bg-gradient-to-br from-indigo-900 to-slate-900 text-white p-6 rounded-2xl shadow-lg space-y-4">
-                <div class="flex justify-between items-start">
-                    <div>
-                        <span class="text-xs uppercase tracking-wider text-indigo-300 font-semibold">Live Tracking</span>
-                        <h3 id="track-id" class="text-lg font-bold">ORD-xxxx</h3>
+        <!-- DASHBOARD (WALLET HOME) -->
+        <div class="page-view" id="dashboard-page">
+            <div class="balance-card">
+                <div class="balance-title">Available Wallet Balance</div>
+                <div class="balance-amount" id="wallet-balance-display">$0.00</div>
+                <div class="user-name" id="wallet-user-name">Loading...</div>
+                <div class="account-id-badge" id="wallet-account-id">ID: #00000</div>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <button class="btn btn-primary" onclick="navigateToPage('store-page')">🛍️ Open Store</button>
+                <button class="btn btn-success" onclick="navigateToPage('scan-page')">📷 Scan Driver</button>
+            </div>
+            <button class="btn" style="background: var(--card-bg); border: 1px solid var(--card-border); color: #38bdf8;" onclick="navigateToPage('receipts-page')">
+                🧾 View Digital Receipts (<span id="dashboard-receipt-count">0</span>)
+            </button>
+        </div>
+
+        <!-- STORE & CHECKOUT PAGE -->
+        <div class="page-view" id="store-page">
+            <div class="page-card" style="text-align: left;">
+                <div class="page-title" style="text-align: center;">🛍️ Store Catalog</div>
+                <div id="product-list" style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px;">
+                    <!-- Dynamically populated products -->
+                </div>
+                <div style="border-top: 1px dashed var(--card-border); padding-top: 12px; margin-top: 12px;">
+                    <div style="font-size: 0.9rem; font-weight: 700; margin-bottom: 8px;">🛒 Your Cart</div>
+                    <div id="cart-items" style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 10px;">Cart is empty.</div>
+                    <input type="text" id="delivery-address" class="input-field" placeholder="Delivery Street / Building Address" style="margin-bottom: 10px;">
+                    <div style="display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 12px;">
+                        <span>Total:</span>
+                        <span id="cart-total" style="color: var(--success);">$0.00</span>
                     </div>
-                    <span id="track-status" class="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-400 text-slate-900">Pending</span>
-                </div>
-                <div class="space-y-1 text-sm text-slate-300">
-                    <p>📍 <strong class="text-white">To:</strong> <span id="track-dest">-</span></p>
-                    <p>🏍️ <strong class="text-white">Assigned Courier:</strong> <span id="track-driver">Unassigned</span></p>
-                </div>
-                
-                <div id="scan-action-box" class="hidden pt-2 border-t border-indigo-800">
-                    <p class="text-xs text-indigo-200 mb-2">Driver has arrived! Scan their QR code to complete delivery and rate:</p>
-                    <button onclick="openScannerModal()" class="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-900 font-bold py-2.5 rounded-xl text-sm transition">📷 Scan Driver QR & Rate</button>
+                    <button class="btn btn-success" style="width: 100%;" onclick="placeOrderAndPay()">PLACE & PAY WITH WALLET</button>
                 </div>
             </div>
         </div>
-    </main>
 
-    <!-- QR Scanner & Rating Modal -->
-    <div id="qr-modal" class="hidden fixed inset-0 bg-slate-950/80 z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 text-slate-900 shadow-xl">
-            <div class="flex justify-between items-center">
-                <h3 class="font-bold text-lg">Scan Driver QR Code</h3>
-                <button onclick="closeScannerModal()" class="text-slate-400 hover:text-slate-600 font-bold">✕</button>
+        <!-- DIGITAL RECEIPTS PAGE -->
+        <div class="page-view" id="receipts-page">
+            <div class="page-card">
+                <div class="page-title">🧾 Digital E-Receipts</div>
+                <div class="receipt-list" id="receipts-list-container">
+                    <p style="color: var(--text-muted); font-size: 0.85rem;">No receipts yet.</p>
+                </div>
             </div>
-            <div id="reader" class="w-full rounded-xl overflow-hidden bg-slate-100"></div>
-            <div id="rating-section" class="hidden space-y-3 pt-2 border-t">
-                <div class="text-center">
-                    <p class="font-semibold text-sm text-emerald-600">✓ Driver Verified: <span id="scanned-driver-name"></span></p>
-                    <p class="text-xs text-slate-500 mt-1">Please rate your delivery experience:</p>
+        </div>
+
+        <!-- BANK TRANSFER -->
+        <div class="page-view" id="transfer-page">
+            <div class="page-card">
+                <div class="page-title">💸 Bank Transfer</div>
+                <div style="display: flex; flex-direction: column; gap: 12px;">
+                    <input type="text" id="transfer-recipient-id" class="input-field" placeholder="Recipient Account ID">
+                    <input type="number" id="transfer-amount" class="input-field" placeholder="Amount ($)" step="0.01">
+                    <button class="btn btn-warning" onclick="executeTransfer()">SEND MONEY</button>
                 </div>
-                <div class="flex justify-center gap-2 text-3xl cursor-pointer">
-                    <span onclick="setRating(1)" class="star text-slate-300 hover:text-amber-400">★</span>
-                    <span onclick="setRating(2)" class="star text-slate-300 hover:text-amber-400">★</span>
-                    <span onclick="setRating(3)" class="star text-slate-300 hover:text-amber-400">★</span>
-                    <span onclick="setRating(4)" class="star text-slate-300 hover:text-amber-400">★</span>
-                    <span onclick="setRating(5)" class="star text-slate-300 hover:text-amber-400">★</span>
+            </div>
+        </div>
+
+        <!-- PAYMENT QR & BARCODE (PIN-LOCKED) -->
+        <div class="page-view" id="payment-page">
+            <div class="page-card" id="qr-lock-card">
+                <div style="font-size: 2.2rem; margin-bottom: 8px;">🔒</div>
+                <div class="page-title">Enter PIN to View QR</div>
+                <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 15px;">Please enter your 4-digit PIN code to reveal your Payment QR & Barcode.</p>
+                <input type="password" id="qr-unlock-pin" class="input-field" placeholder="••••" maxlength="4" style="letter-spacing: 8px; font-size: 1.4rem; text-align: center; margin-bottom: 15px;">
+                <button class="btn btn-primary" style="width: 100%;" onclick="unlockPaymentQr()">SHOW MY QR</button>
+            </div>
+
+            <div class="page-card" id="qr-content-card" style="display: none;">
+                <div class="page-title">📱 Account Barcode</div>
+                <div class="code-wrapper"><svg id="account-barcode-svg"></svg></div>
+                <hr style="border: none; border-top: 1px dashed var(--card-border); margin: 15px 0;">
+                <div class="page-title">⚡ Dynamic Payment QR</div>
+                <div class="qr-wrapper"><div id="account-qr-code"></div></div>
+                <button class="btn btn-danger" style="width: 100%; margin-top: 15px;" onclick="lockPaymentQr()">HIDE / LOCK QR</button>
+            </div>
+        </div>
+
+        <!-- SCAN DRIVER QR -->
+        <div class="page-view" id="scan-page">
+            <div class="page-card">
+                <div class="page-title">📷 Scan Driver QR / POS Code</div>
+                <div id="reader"></div>
+            </div>
+        </div>
+
+        <!-- PIN SETTINGS -->
+        <div class="page-view" id="pin-settings-page">
+            <div class="page-card">
+                <div class="page-title">🔐 Change 4-Digit PIN</div>
+                <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 10px;">
+                    <input type="password" id="old-pin" class="input-field" placeholder="Old 4-Digit PIN" maxlength="4">
+                    <input type="password" id="new-pin" class="input-field" placeholder="New 4-Digit PIN" maxlength="4">
+                    <button class="btn btn-primary" onclick="updatePinCode()">UPDATE PIN</button>
                 </div>
-                <button onclick="submitCompletion()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl text-sm transition">Submit Rating & Complete Delivery</button>
             </div>
         </div>
     </div>
 
+    <!-- PAYMENT SUCCESSFUL MODAL -->
+    <div class="modal-backdrop" id="success-modal">
+        <div class="modal-box" style="padding: 25px 20px;">
+            <div style="width: 70px; height: 70px; background: rgba(34, 197, 94, 0.2); color: #22c55e; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 2.5rem; margin: 0 auto 12px auto; border: 2px solid #22c55e;">
+                ✓
+            </div>
+            <div style="font-size: 1.3rem; font-weight: bold; color: #22c55e; margin-bottom: 4px;">PAYMENT SUCCESSFUL!</div>
+            <div style="font-size: 0.85rem; color: var(--text-muted);" id="scan-success-details">Order Paid & Dispatched</div>
+            <div style="font-size: 1.8rem; font-weight: bold; color: white; margin: 8px 0;" id="scan-success-amount">$0.00</div>
+            <div style="font-size: 0.75rem; color: #38bdf8; margin-bottom: 15px;">🧾 E-Receipt saved to your Wallet!</div>
+            <button class="btn btn-success" style="width: 100%; padding: 10px;" onclick="closeSuccessModal()">DONE</button>
+        </div>
+    </div>
+
+    <!-- RECEIPT DETAIL MODAL -->
+    <div class="modal-backdrop" id="receipt-detail-modal">
+        <div class="modal-box" style="text-align: left; font-family: monospace;">
+            <div style="text-align: center; border-bottom: 1px dashed #475569; padding-bottom: 10px; margin-bottom: 10px;">
+                <div style="font-size: 1.1rem; font-weight: bold; color: white;">🧾 ELECTRONIC RECEIPT</div>
+                <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 3px;" id="modal-receipt-id">#INV_000000</div>
+                <div style="font-size: 0.7rem; color: #94a3b8;" id="modal-receipt-date">Date</div>
+            </div>
+            <div id="modal-receipt-items" style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; font-size: 0.85rem;"></div>
+            <div style="border-top: 1px dashed #475569; padding-top: 8px; display: flex; justify-content: space-between; font-size: 1.1rem; font-weight: bold; color: #22c55e; margin-bottom: 15px;">
+                <span>TOTAL:</span>
+                <span id="modal-receipt-total">$0.00</span>
+            </div>
+            <button class="btn btn-primary" style="width: 100%; padding: 10px;" onclick="document.getElementById('receipt-detail-modal').style.display='none'">CLOSE</button>
+        </div>
+    </div>
+
+    <div id="toast">Notification</div>
+
+    <!-- Firebase SDK Integration -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getDatabase, ref, push, onValue, update, set, get, child } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+        import { getFirestore, doc, setDoc, updateDoc, increment, collection, addDoc, getDoc, query, where, getDocs, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyBzAlFc53i183dYa56nDFqEROIrJIiBUsg",
@@ -165,243 +280,365 @@
         };
 
         const app = initializeApp(firebaseConfig);
-        const db = getDatabase(app);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
 
-        let currentUser = null;
-        let products = {};
-        let cart = [];
-        let currentTrackKey = null;
-        let assignedDriverId = null;
-        let assignedDriverName = '';
-        let selectedRating = 5;
-        let html5QrcodeScanner = null;
+        window.FB = { auth, db, doc, setDoc, updateDoc, increment, collection, addDoc, getDoc, query, where, getDocs, onSnapshot, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut };
 
-        window.switchAuthTab = function(tab) {
-            if(tab === 'login') {
-                document.getElementById('form-login').classList.remove('hidden');
-                document.getElementById('form-signup').classList.add('hidden');
-                document.getElementById('tab-login').className = "flex-1 pb-2 border-b-2 border-indigo-600 text-indigo-600 font-semibold";
-                document.getElementById('tab-signup').className = "flex-1 pb-2 text-slate-400 border-b-2 border-transparent";
-            } else {
-                document.getElementById('form-signup').classList.remove('hidden');
-                document.getElementById('form-login').classList.add('hidden');
-                document.getElementById('tab-signup').className = "flex-1 pb-2 border-b-2 border-indigo-600 text-indigo-600 font-semibold";
-                document.getElementById('tab-login').className = "flex-1 pb-2 text-slate-400 border-b-2 border-transparent";
-            }
-        }
+        let balanceUnsubscribe = null;
+        let receiptsUnsubscribe = null;
+        let lastHandledChargeTime = 0;
 
-        window.signupCustomer = function() {
-            const name = document.getElementById('signup-name').value.trim();
-            const phone = document.getElementById('signup-phone').value.trim();
-            const email = document.getElementById('signup-email').value.trim().toLowerCase();
-            if(!name || !phone || !email) return alert('Please fill in all signup fields.');
-
-            const userKey = email.replace(/[.#$\/\[\]]/g, "_");
-            const userRef = ref(db, `customers/${userKey}`);
-
-            get(userRef).then((snapshot) => {
-                if(snapshot.exists()) {
-                    alert('An account with this email already exists. Please login.');
-                } else {
-                    set(userRef, { name, phone, email }).then(() => {
-                        loginSuccess({ name, phone, email });
-                    });
-                }
-            });
-        }
-
-        window.loginCustomer = function() {
-            const identifier = document.getElementById('login-identifier').value.trim().toLowerCase();
-            if(!identifier) return alert('Please enter your email or phone.');
-
-            const userKey = identifier.replace(/[.#$\/\[\]]/g, "_");
-            get(ref(db, `customers/${userKey}`)).then((snapshot) => {
-                if(snapshot.exists()) {
-                    loginSuccess(snapshot.val());
-                } else {
-                    // Try checking by phone or searching values
-                    get(ref(db, 'customers')).then((allSnap) => {
-                        let found = null;
-                        allSnap.forEach((childSnap) => {
-                            const u = childSnap.val();
-                            if(u.email === identifier || u.phone === identifier) found = u;
-                        });
-                        if(found) {
-                            loginSuccess(found);
-                        } else {
-                            alert('Account not found. Please register an account first.');
-                        }
-                    });
-                }
-            });
-        }
-
-        function loginSuccess(user) {
-            currentUser = user;
-            document.getElementById('auth-container').classList.add('hidden');
-            document.getElementById('store-main-container').classList.remove('hidden');
-            document.getElementById('user-profile-nav').classList.remove('hidden');
-            document.getElementById('nav-username').innerText = user.name;
-            loadProducts();
-        }
-
-        window.logoutCustomer = function() {
-            currentUser = null;
-            document.getElementById('auth-container').classList.remove('hidden');
-            document.getElementById('store-main-container').classList.add('hidden');
-            document.getElementById('user-profile-nav').classList.add('hidden');
-            cart = [];
-            renderCart();
-        }
-
-        function loadProducts() {
-            onValue(ref(db, 'products'), (snapshot) => {
-                const data = snapshot.val();
-                if(data) {
-                    products = data;
-                } else {
-                    products = {
-                        'p1': { name: "Latte & Croissant Combo", price: 15000, category: "Food & Cafe" },
-                        'p2': { name: "Fresh Grocery Bag", price: 45000, category: "Groceries" },
-                        'p3': { name: "USB-C Fast Charger", price: 28000, category: "Electronics" }
-                    };
-                }
-                renderStore();
-            });
-        }
-
-        window.renderStore = function() {
-            const container = document.getElementById('product-list');
-            container.innerHTML = Object.entries(products).map(([id, p]) => `
-                <div class="border border-slate-200 p-4 rounded-xl flex flex-col justify-between hover:border-indigo-300 transition">
-                    <div>
-                        <span class="text-xs font-semibold text-indigo-600 uppercase">${p.category || 'General'}</span>
-                        <h3 class="font-bold text-slate-900 mt-1">${p.name}</h3>
-                        <p class="text-slate-600 text-sm mt-1">₮${Number(p.price).toLocaleString()}</p>
-                    </div>
-                    <button onclick="addToCart('${id}')" class="mt-4 bg-slate-100 hover:bg-indigo-600 hover:text-white text-slate-800 font-medium py-2 rounded-lg text-sm transition">Add to Cart</button>
-                </div>
-            `).join('');
-        }
-
-        window.addToCart = function(id) {
-            const p = products[id];
-            if(p) {
-                cart.push({ name: p.name, price: Number(p.price), category: p.category || 'General' });
-                renderCart();
-            }
-        }
-
-        window.addCustomParcel = function() {
-            const pickup = document.getElementById('custom-pickup').value;
-            const desc = document.getElementById('custom-desc').value;
-            if(!desc) return alert('Please enter package description');
-            cart.push({ name: `Custom: ${desc} (Pickup: ${pickup || 'Specified'})`, price: 20000, category: 'Custom Parcel' });
-            document.getElementById('custom-pickup').value = '';
-            document.getElementById('custom-desc').value = '';
-            renderCart();
-        }
-
-        window.renderCart = function() {
-            const container = document.getElementById('cart-items');
-            if(cart.length === 0) return container.innerHTML = `<p class="text-slate-400 py-2">Your cart is empty.</p>`;
-            container.innerHTML = cart.map((item, idx) => `
-                <div class="py-2.5 flex justify-between items-center text-sm">
-                    <div>
-                        <p class="font-medium text-slate-800">${item.name}</p>
-                        <p class="text-xs text-slate-500">₮${Number(item.price).toLocaleString()}</p>
-                    </div>
-                    <button onclick="cart.splice(${idx},1);renderCart()" class="text-red-500 hover:text-red-700 font-bold text-xs">Remove</button>
-                </div>
-            `).join('');
-        }
-
-        window.placeOrder = function() {
-            if(cart.length === 0) return alert('Your cart is empty.');
-            const address = document.getElementById('cust-address').value.trim();
-            if(!address) return alert('Please enter your delivery address.');
-
-            const newOrderRef = push(ref(db, 'orders'));
-            const orderData = {
-                customerName: currentUser.name,
-                customerPhone: currentUser.phone,
-                customerEmail: currentUser.email,
-                customerAddress: address,
-                items: cart,
-                total: cart.reduce((sum, i) => sum + i.price, 0),
-                status: 'Unassigned',
-                driverId: '',
-                driverName: 'Unassigned',
-                createdAt: Date.now()
-            };
-
-            import("https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js").then(({ set }) => {
-                set(newOrderRef, orderData).then(() => {
-                    currentTrackKey = newOrderRef.key;
-                    cart = [];
-                    renderCart();
-                    document.getElementById('active-order-badge').classList.remove('hidden');
-                    document.getElementById('tracking-card').classList.remove('hidden');
-                    document.getElementById('track-id').innerText = `ORD-${currentTrackKey.slice(-6).toUpperCase()}`;
-                    document.getElementById('track-dest').innerText = address;
-
-                    onValue(ref(db, `orders/${currentTrackKey}`), (snapshot) => {
-                        const data = snapshot.val();
-                        if(!data) return;
-                        document.getElementById('track-status').innerText = data.status;
-                        document.getElementById('track-driver').innerText = data.driverName || 'Unassigned';
-                        assignedDriverId = data.driverId;
-                        assignedDriverName = data.driverName;
-
-                        if(data.status === 'Picked Up' || data.status === 'Assigned') {
-                            document.getElementById('scan-action-box').classList.remove('hidden');
-                        }
-                        if(data.status === 'Delivered') {
-                            document.getElementById('scan-action-box').classList.add('hidden');
-                        }
-                    });
-                    alert('Order placed successfully!');
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                document.getElementById('app-header').style.display = 'flex';
+                const accId = user.email.split('@')[0];
+                
+                const q = query(collection(db, "accounts"), where("accountId", "==", accId));
+                balanceUnsubscribe = onSnapshot(q, (snapshot) => {
+                    if (!snapshot.empty) {
+                        const docSnap = snapshot.docs[0];
+                        const data = docSnap.data();
+                        window.currentAccount = data;
+                        window.currentAccount.docRef = docSnap.ref;
+                        renderDashboardUI();
+                    }
                 });
+
+                const rq = query(collection(db, "receipts"), where("accountId", "==", accId));
+                receiptsUnsubscribe = onSnapshot(rq, (snap) => {
+                    const list = [];
+                    snap.forEach(d => list.push({ id: d.id, ...d.data() }));
+                    list.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+                    window.userReceipts = list;
+                    renderReceiptsUI();
+                });
+
+                navigateToPage('dashboard-page');
+            } else {
+                if (balanceUnsubscribe) balanceUnsubscribe();
+                if (receiptsUnsubscribe) receiptsUnsubscribe();
+                window.currentAccount = null;
+                window.userReceipts = [];
+                document.getElementById('app-header').style.display = 'none';
+                stopCameraScanner();
+                document.querySelectorAll('.page-view').forEach(p => p.classList.remove('active-page'));
+                document.getElementById('login-page').classList.add('active-page');
+                toggleSidebar(false);
+            }
+        });
+    </script>
+
+    <!-- App Logic & Storefront Integration -->
+    <script>
+        let html5QrcodeScanner = null;
+        window.currentAccount = null;
+        window.userReceipts = [];
+        window.cart = [];
+
+        const storeProducts = [
+            { id: 1, name: "Latte & Croissant Combo", price: 15.00, category: "Food & Cafe", icon: "☕" },
+            { id: 2, name: "Fresh Grocery Bag", price: 45.00, category: "Groceries", icon: "🍎" },
+            { id: 3, name: "USB-C Fast Charger", price: 28.00, category: "Electronics", icon: "🔌" },
+            { id: 4, name: "Emergency First Aid Kit", price: 35.00, category: "Essentials", icon: "🩹" }
+        ];
+
+        function triggerVibration() {
+            if ("vibrate" in navigator) { navigator.vibrate(200); }
+        }
+
+        function navigateToPage(pageId) {
+            toggleSidebar(false);
+            stopCameraScanner();
+            document.querySelectorAll('.page-view').forEach(p => p.classList.remove('active-page'));
+            document.getElementById(pageId)?.classList.add('active-page');
+
+            if (pageId === 'payment-page') {
+                lockPaymentQr();
+            } else if (pageId === 'scan-page') {
+                startCameraScanner();
+            } else if (pageId === 'store-page') {
+                renderStoreCatalog();
+            }
+        }
+
+        function toggleSidebar(forceState) {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebar-overlay');
+            const shouldOpen = forceState !== undefined ? forceState : !sidebar.classList.contains('active');
+            sidebar.classList.toggle('active', shouldOpen);
+            overlay.classList.toggle('active', shouldOpen);
+        }
+
+        function renderStoreCatalog() {
+            const container = document.getElementById('product-list');
+            container.innerHTML = storeProducts.map(p => `
+                <div style="background: #0f172a; border: 1px solid var(--card-border); border-radius: 10px; padding: 10px; display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <div style="font-size: 0.9rem; font-weight: 600;">${p.icon} ${p.name}</div>
+                        <div style="font-size: 0.75rem; color: var(--text-muted);">$${p.price.toFixed(2)}</div>
+                    </div>
+                    <button class="btn btn-primary" style="padding: 6px 12px; font-size: 0.75rem;" onclick="addToCart(${p.id})">ADD</button>
+                </div>
+            `).join('');
+            renderCartUI();
+        }
+
+        function addToCart(productId) {
+            const prod = storeProducts.find(p => p.id === productId);
+            const existing = window.cart.find(i => i.id === productId);
+            if (existing) {
+                existing.quantity += 1;
+            } else {
+                window.cart.push({ ...prod, quantity: 1 });
+            }
+            renderCartUI();
+        }
+
+        function renderCartUI() {
+            const container = document.getElementById('cart-items');
+            if (window.cart.length === 0) {
+                container.innerHTML = "Cart is empty.";
+                document.getElementById('cart-total').innerText = "$0.00";
+                return;
+            }
+            container.innerHTML = window.cart.map((item, idx) => `
+                <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                    <span>${item.icon} ${item.name} (x${item.quantity})</span>
+                    <span>$${(item.price * item.quantity).toFixed(2)} <button onclick="window.cart.splice(${idx},1);renderCartUI()" style="color:var(--danger);background:none;border:none;cursor:pointer;margin-left:5px;">✕</button></span>
+                </div>
+            `).join('');
+            const total = window.cart.reduce((sum, i) => sum + (i.price * i.quantity), 0);
+            document.getElementById('cart-total').innerText = `$${total.toFixed(2)}`;
+        }
+
+        // 🛍️ ОДООГИЙН САГСААР ЗАХИАЛГА ҮҮСГЭЖ, ТҮҮНИЙГЭЭ УТАСНЫХАА БАЛАНСААС ШУУД ТӨЛӨХ
+        async function placeOrderAndPay() {
+            if (window.cart.length === 0) return fireToast("❌ Your cart is empty.");
+            const address = document.getElementById('delivery-address').value.trim();
+            if (!address) return fireToast("❌ Enter delivery address.");
+
+            const totalAmount = window.cart.reduce((sum, i) => sum + (i.price * i.quantity), 0);
+            if (window.currentAccount.balance < totalAmount) return fireToast("❌ Insufficient wallet balance.");
+
+            try {
+                // 1. Хэрэглэгчийн балансыг хасах
+                await window.FB.updateDoc(window.currentAccount.docRef, {
+                    balance: window.FB.increment(-totalAmount)
+                });
+
+                // 2. Deliveries цуглуулгад order үүсгэх (Driver Portal дээр шууд харагдана)
+                const orderRef = await window.FB.addDoc(window.FB.collection(window.FB.db, "orders"), {
+                    customerName: window.currentAccount.name,
+                    customerPhone: "Wallet User",
+                    customerAddress: address,
+                    items: window.cart,
+                    total: totalAmount,
+                    paymentMethod: "Mobile Wallet",
+                    status: "Unassigned",
+                    driverId: "",
+                    driverName: "Unassigned",
+                    createdAt: Date.now()
+                });
+
+                // 3. E-Receipt үүсгэж хадгалах
+                await window.FB.addDoc(window.FB.collection(window.FB.db, "receipts"), {
+                    accountId: String(window.currentAccount.accountId),
+                    invoiceId: orderRef.id.slice(-6).toUpperCase(),
+                    amount: totalAmount,
+                    items: window.cart,
+                    createdAt: Date.now()
+                });
+
+                triggerVibration();
+                document.getElementById('scan-success-amount').innerText = `$${totalAmount.toFixed(2)}`;
+                document.getElementById('success-modal').style.display = 'flex';
+                window.cart = [];
+                renderCartUI();
+            } catch (err) { fireToast("❌ Checkout Error: " + err.message); }
+        }
+
+        function renderReceiptsUI() {
+            document.getElementById('dashboard-receipt-count').innerText = window.userReceipts.length;
+            const container = document.getElementById('receipts-list-container');
+            if (window.userReceipts.length === 0) {
+                container.innerHTML = `<p style="color: var(--text-muted); font-size: 0.85rem; text-align: center;">No digital receipts yet.</p>`;
+                return;
+            }
+            container.innerHTML = '';
+            window.userReceipts.forEach((rec, idx) => {
+                const dateStr = rec.createdAt ? new Date(rec.createdAt).toLocaleString() : 'Recent';
+                const itemSummary = (rec.items && rec.items.length > 0) ? rec.items.map(i => `${i.icon || '📦'} ${i.name} (${i.quantity}x)`).join(', ') : 'Direct Payment';
+                const card = document.createElement('div');
+                card.className = 'receipt-card';
+                card.onclick = () => openReceiptDetail(idx);
+                card.innerHTML = `
+                    <div class="receipt-header">
+                        <span class="receipt-id">#${rec.invoiceId || rec.id.slice(0,8)}</span>
+                        <span class="receipt-total">$${Number(rec.amount).toFixed(2)}</span>
+                    </div>
+                    <div class="receipt-date">📅 ${dateStr}</div>
+                    <div class="receipt-items-preview">${itemSummary}</div>
+                `;
+                container.appendChild(card);
             });
         }
 
-        window.openScannerModal = function() {
-            document.getElementById('qr-modal').classList.remove('hidden');
-            html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 });
-            html5QrcodeScanner.render((decodedText) => {
-                if(decodedText.includes(assignedDriverId) || decodedText.length > 5) {
-                    html5QrcodeScanner.clear();
-                    document.getElementById('reader').style.display = 'none';
-                    document.getElementById('scanned-driver-name').innerText = assignedDriverName;
-                    document.getElementById('rating-section').classList.remove('hidden');
-                } else {
-                    alert('Invalid driver QR code.');
+        function openReceiptDetail(index) {
+            const rec = window.userReceipts[index];
+            if (!rec) return;
+            document.getElementById('modal-receipt-id').innerText = `Receipt: #${rec.invoiceId || rec.id}`;
+            document.getElementById('modal-receipt-date').innerText = rec.createdAt ? new Date(rec.createdAt).toLocaleString() : '';
+            document.getElementById('modal-receipt-total').innerText = `$${Number(rec.amount).toFixed(2)}`;
+            const itemsContainer = document.getElementById('modal-receipt-items');
+            itemsContainer.innerHTML = '';
+            if (rec.items && rec.items.length > 0) {
+                rec.items.forEach(item => {
+                    const row = document.createElement('div');
+                    row.style.display = 'flex';
+                    row.style.justifyContent = 'space-between';
+                    row.innerHTML = `<span>${item.icon || '📦'} ${item.name} x${item.quantity}</span><span>$${(Number(item.price) * Number(item.quantity)).toFixed(2)}</span>`;
+                    itemsContainer.appendChild(row);
+                });
+            } else {
+                itemsContainer.innerHTML = `<div style="color: #94a3b8;">Wallet Direct Transfer</div>`;
+            }
+            document.getElementById('receipt-detail-modal').style.display = 'flex';
+        }
+
+        function unlockPaymentQr() {
+            const pinInput = document.getElementById('qr-unlock-pin').value.trim();
+            const currentPin = window.currentAccount.pinCode || "1234";
+            if (pinInput !== currentPin) { triggerVibration(); fireToast("❌ Incorrect PIN!"); return; }
+            triggerVibration();
+            document.getElementById('qr-lock-card').style.display = 'none';
+            document.getElementById('qr-content-card').style.display = 'block';
+            document.getElementById('qr-unlock-pin').value = '';
+            renderCodes();
+        }
+
+        function lockPaymentQr() {
+            document.getElementById('qr-lock-card').style.display = 'block';
+            document.getElementById('qr-content-card').style.display = 'none';
+            document.getElementById('qr-unlock-pin').value = '';
+        }
+
+        async function handleLogin() {
+            const accountId = document.getElementById('login-account-id').value.trim();
+            const passcode = document.getElementById('login-passcode').value.trim();
+            if (!accountId || !passcode) return fireToast("❌ Enter ID & Passcode.");
+            try {
+                await window.FB.signInWithEmailAndPassword(window.FB.auth, `${accountId}@wallet.local`, passcode);
+            } catch (err) { fireToast("❌ Login Failed: " + err.message); }
+        }
+
+        async function seedDatabase() {
+            try {
+                let user;
+                try {
+                    const cred = await window.FB.createUserWithEmailAndPassword(window.FB.auth, "10011@wallet.local", "123456");
+                    user = cred.user;
+                } catch(e) {
+                    const cred = await window.FB.signInWithEmailAndPassword(window.FB.auth, "10011@wallet.local", "123456");
+                    user = cred.user;
                 }
-            }, () => {});
+                await window.FB.setDoc(window.FB.doc(window.FB.db, "accounts", user.uid), {
+                    accountId: "10011", name: "Alex (Customer)", balance: 1365.50, pinCode: "1234"
+                }, { merge: true });
+                fireToast("✅ Test Account 10011 Created!");
+            } catch (err) { fireToast("❌ Seed Error: " + err.message); }
         }
 
-        window.closeScannerModal = function() {
-            if(html5QrcodeScanner) html5QrcodeScanner.clear().catch(() => {});
-            document.getElementById('qr-modal').classList.add('hidden');
-            document.getElementById('reader').style.display = 'block';
-            document.getElementById('rating-section').classList.add('hidden');
+        async function handleLogout() {
+            await window.FB.signOut(window.FB.auth);
+            fireToast("Logged out.");
         }
 
-        window.setRating = function(stars) {
-            selectedRating = stars;
-            document.querySelectorAll('.star').forEach((el, idx) => {
-                el.style.color = idx < stars ? '#f59e0b' : '#cbd5e1';
+        function renderDashboardUI() {
+            if (!window.currentAccount) return;
+            document.getElementById('header-user-display').innerText = window.currentAccount.name;
+            document.getElementById('wallet-user-name').innerText = window.currentAccount.name;
+            document.getElementById('wallet-account-id').innerText = `ID: #${window.currentAccount.accountId}`;
+            document.getElementById('wallet-balance-display').innerText = `$${Number(window.currentAccount.balance).toFixed(2)}`;
+        }
+
+        function renderCodes() {
+            if (!window.currentAccount) return;
+            try {
+                JsBarcode("#account-barcode-svg", window.currentAccount.accountId, { format: "CODE128", width: 2, height: 45, displayValue: true });
+            } catch(e) {}
+            const qrContainer = document.getElementById('account-qr-code');
+            qrContainer.innerHTML = '';
+            new QRCode(qrContainer, {
+                text: `CUSTOMER_WALLET:${window.currentAccount.accountId}:${window.currentAccount.name}`,
+                width: 160, height: 160, correctLevel: QRCode.CorrectLevel.L
             });
         }
 
-        window.submitCompletion = function() {
-            update(ref(db, `orders/${currentTrackKey}`), {
-                status: 'Delivered',
-                rating: selectedRating
-            }).then(() => {
-                closeScannerModal();
-                alert(`Thank you! Completed with a ${selectedRating}-star rating.`);
-            });
+        function startCameraScanner() {
+            html5QrcodeScanner = new Html5Qrcode("reader");
+            html5QrcodeScanner.start(
+                { facingMode: "environment" },
+                { fps: 10, qrbox: { width: 200, height: 200 } },
+                (decodedText) => {
+                    stopCameraScanner();
+                    triggerVibration();
+                    fireToast("✅ Scanned Driver Code successfully!");
+                    navigateToPage('dashboard-page');
+                },
+                () => {}
+            ).catch(err => fireToast("❌ Camera Error."));
+        }
+
+        function stopCameraScanner() {
+            if (html5QrcodeScanner) {
+                html5QrcodeScanner.stop().then(() => { html5QrcodeScanner.clear(); html5QrcodeScanner = null; }).catch(() => { html5QrcodeScanner = null; });
+            }
+        }
+
+        function closeSuccessModal() {
+            document.getElementById('success-modal').style.display = 'none';
+            navigateToPage('dashboard-page');
+        }
+
+        async function updatePinCode() {
+            const oldPin = document.getElementById('old-pin').value.trim();
+            const newPin = document.getElementById('new-pin').value.trim();
+            const currentPin = window.currentAccount.pinCode || "1234";
+            if (oldPin !== currentPin) return fireToast("❌ Old PIN incorrect.");
+            if (newPin.length !== 4 || isNaN(newPin)) return fireToast("❌ New PIN must be 4 digits.");
+            try {
+                await window.FB.updateDoc(window.currentAccount.docRef, { pinCode: newPin });
+                fireToast("✅ PIN updated!");
+                document.getElementById('old-pin').value = '';
+                document.getElementById('new-pin').value = '';
+                navigateToPage('dashboard-page');
+            } catch (err) { fireToast("❌ Failed: " + err.message); }
+        }
+
+        async function executeTransfer() {
+            const recipientId = document.getElementById('transfer-recipient-id').value.trim();
+            const amount = parseFloat(document.getElementById('transfer-amount').value);
+            if (!recipientId || isNaN(amount) || amount <= 0) return fireToast("❌ Check amount/ID.");
+            if (window.currentAccount.balance < amount) return fireToast("❌ Insufficient funds.");
+            try {
+                const q = window.FB.query(window.FB.collection(window.FB.db, "accounts"), window.FB.where("accountId", "==", recipientId));
+                const snap = await window.FB.getDocs(q);
+                if (snap.empty) return fireToast("❌ Recipient not found.");
+                const recipientDoc = snap.docs[0];
+                await window.FB.updateDoc(window.currentAccount.docRef, { balance: window.FB.increment(-amount) });
+                await window.FB.updateDoc(recipientDoc.ref, { balance: window.FB.increment(amount) });
+                triggerVibration();
+                fireToast(`🎉 Sent $${amount.toFixed(2)} successfully!`);
+                navigateToPage('dashboard-page');
+            } catch (err) { fireToast("❌ Error: " + err.message); }
+        }
+
+        function fireToast(msg) {
+            const toast = document.getElementById('toast');
+            toast.innerText = msg;
+            toast.style.display = 'block';
+            setTimeout(() => { toast.style.display = 'none'; }, 3000);
         }
     </script>
 </body>
