@@ -15,7 +15,7 @@
             <h1 class="text-lg font-bold text-indigo-400">🏍️ SwiftRoute Courier</h1>
             <div id="staff-session-info" class="hidden items-center gap-3 text-xs">
                 <span class="bg-slate-800 px-3 py-1.5 rounded-xl font-semibold">👤 <span id="active-driver-label">Courier</span></span>
-                <button onclick="logoutCourier()" class="text-rose-400 hover:text-rose-300 font-semibold">Switch</button>
+                <button id="switch-driver-btn" onclick="logoutCourier()" class="text-rose-400 hover:text-rose-300 font-semibold">Switch</button>
             </div>
         </div>
     </header>
@@ -43,11 +43,8 @@
         <div class="flex justify-between items-center">
             <div>
                 <h2 class="text-xl font-bold text-white">Active Delivery Queue</h2>
-                <p class="text-xs text-slate-400">Tap "Focus Delivery" to open full-screen address & order QR</p>
+                <p class="text-xs text-slate-400">Tap "Start Focused Delivery" to lock into an address & order QR</p>
             </div>
-            <button id="resume-focus-btn" onclick="openFocusedOrderScreen(focusedOrderKey)" class="hidden bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2 rounded-xl text-xs">
-                🎯 Resume Active Delivery
-            </button>
         </div>
 
         <div id="staff-orders-list" class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -55,22 +52,17 @@
         </div>
     </main>
 
-    <!-- FULL-SCREEN FOCUSED DELIVERY VIEW -->
-    <div id="focused-delivery-overlay" class="hidden fixed inset-0 bg-slate-950 z-50 overflow-y-auto p-4 sm:p-8 flex flex-col justify-between">
+    <!-- FULL-SCREEN LOCKED FOCUSED DELIVERY VIEW -->
+    <div id="focused-delivery-overlay" class="hidden fixed inset-0 bg-slate-950 z-50 overflow-y-auto p-4 sm:p-8 flex flex-col justify-center">
         
-        <!-- Active Delivery Card -->
+        <!-- Active Locked Delivery Card -->
         <div id="focused-active-card" class="max-w-2xl w-full mx-auto bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl">
             <div class="flex justify-between items-center border-b border-slate-800 pb-4">
                 <div>
-                    <span class="text-xs uppercase tracking-widest text-indigo-400 font-bold">Focused Delivery</span>
+                    <span class="text-xs uppercase tracking-widest text-indigo-400 font-bold">Focused Delivery • Locked Until QR Scan</span>
                     <h2 id="focus-order-id" class="text-2xl font-extrabold text-white mt-0.5">ORD-XXXXXX</h2>
                 </div>
-                <div class="flex items-center gap-2">
-                    <span id="focus-status-badge" class="px-3 py-1 rounded-full text-xs font-bold bg-amber-400 text-slate-900">Picked Up</span>
-                    <button onclick="exitFocusedScreen()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-xl text-xs font-semibold">
-                        Queue ✕
-                    </button>
-                </div>
+                <span id="focus-status-badge" class="px-3 py-1 rounded-full text-xs font-bold bg-amber-400 text-slate-900">Assigned</span>
             </div>
 
             <!-- Prominent Delivery Address -->
@@ -94,37 +86,33 @@
 
             <!-- Unique QR Code for THIS Specific Order -->
             <div class="bg-white text-slate-900 rounded-2xl p-5 text-center space-y-2">
-                <p class="text-xs font-extrabold uppercase tracking-wider text-slate-500">Show This Order's QR to Customer</p>
+                <p class="text-xs font-extrabold uppercase tracking-wider text-slate-500">Customer Must Scan This QR to Complete</p>
                 <div id="focus-order-qr-box" class="flex justify-center py-2"></div>
                 <p id="focus-qr-payload-text" class="text-[11px] font-mono text-slate-500 break-all"></p>
             </div>
 
-            <!-- Action Buttons -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <button id="focus-pickup-btn" onclick="markFocusedPickedUp()" class="bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold py-3.5 rounded-2xl text-sm transition">
+            <!-- En Route / Picked Up Action + Waiting Indicator -->
+            <div class="space-y-3">
+                <button id="focus-pickup-btn" onclick="markFocusedPickedUp()" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold py-3.5 rounded-2xl text-sm transition">
                     🏍️ Mark Picked Up / En Route
                 </button>
-                <button onclick="markFocusedDelivered()" class="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-extrabold py-3.5 rounded-2xl text-sm transition">
-                    ✓ Complete Delivery
-                </button>
+                <p class="text-center text-xs text-slate-400 animate-pulse">
+                    ⌛ Waiting for customer to scan this order QR code to finish delivery...
+                </p>
             </div>
         </div>
 
-        <!-- "CHOOSE WHO IS NEXT" PICKER (Shown After Current Delivery Is Done) -->
+        <!-- "CHOOSE WHO IS NEXT" PICKER (Shown Automatically After Customer Scans QR) -->
         <div id="next-delivery-picker" class="hidden max-w-2xl w-full mx-auto bg-slate-900 border border-emerald-500/40 rounded-3xl p-6 sm:p-8 space-y-5 shadow-2xl">
             <div class="text-center border-b border-slate-800 pb-4">
                 <div class="w-12 h-12 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-2xl mx-auto mb-2">✓</div>
-                <h3 class="text-xl font-extrabold text-white">Delivery Completed!</h3>
-                <p class="text-xs text-slate-400 mt-1">Choose which order you want to deliver next:</p>
+                <h3 class="text-xl font-extrabold text-white">QR Verified & Delivered!</h3>
+                <p class="text-xs text-slate-400 mt-1">Choose who is next to deliver:</p>
             </div>
 
             <div id="next-orders-choices" class="space-y-3">
                 <!-- Populated dynamically with remaining orders -->
             </div>
-
-            <button onclick="exitFocusedScreen()" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold py-3 rounded-2xl text-sm transition">
-                Back to Full Queue
-            </button>
         </div>
     </div>
 
@@ -146,10 +134,12 @@
         const app = initializeApp(deliveryConfig);
         const db = getDatabase(app);
 
+        const STORAGE_DRIVER_KEY = "swiftroute_driver";
+        const STORAGE_FOCUSED_KEY = "swiftroute_focused_order";
+
         let allOrders = [];
         let currentDriver = null;
         let focusedOrderKey = null;
-        let lastKnownFocusedStatus = null;
 
         function formatMNT(amount) {
             return Number(amount || 0).toLocaleString();
@@ -160,12 +150,18 @@
             const id = document.getElementById('driver-id-input').value.trim();
             if (!name || !id) return alert("Enter both your Courier Name and Courier ID.");
             currentDriver = { name, id };
-            sessionStorage.setItem("swiftroute_driver", JSON.stringify(currentDriver));
+            sessionStorage.setItem(STORAGE_DRIVER_KEY, JSON.stringify(currentDriver));
             showDashboard();
         };
 
         window.logoutCourier = function() {
-            sessionStorage.removeItem("swiftroute_driver");
+            // Prevent switching/logging out while locked in a focused delivery
+            const activeFocused = allOrders.find(o => o.key === focusedOrderKey && o.status !== 'Delivered');
+            if (activeFocused) {
+                return alert("You cannot exit while an active focused delivery is in progress. The customer must scan the order QR first.");
+            }
+            sessionStorage.removeItem(STORAGE_DRIVER_KEY);
+            sessionStorage.removeItem(STORAGE_FOCUSED_KEY);
             currentDriver = null;
             focusedOrderKey = null;
             document.getElementById('focused-delivery-overlay').classList.add('hidden');
@@ -180,7 +176,14 @@
             document.getElementById('staff-session-info').classList.remove('hidden');
             document.getElementById('staff-session-info').classList.add('flex');
             document.getElementById('active-driver-label').innerText = `${currentDriver.name} (${currentDriver.id})`;
+
+            const savedFocus = sessionStorage.getItem(STORAGE_FOCUSED_KEY);
+            if (savedFocus) {
+                focusedOrderKey = savedFocus;
+            }
+
             renderQueue();
+            syncFocusedScreenWithOrder();
         }
 
         onValue(ref(db, 'orders'), (snapshot) => {
@@ -205,10 +208,6 @@
             const container = document.getElementById('staff-orders-list');
             const activeQueue = allOrders.filter(o => o.status !== 'Delivered');
 
-            const resumeBtn = document.getElementById('resume-focus-btn');
-            const focusedOrder = allOrders.find(o => o.key === focusedOrderKey && o.status !== 'Delivered');
-            resumeBtn.classList.toggle('hidden', !focusedOrder);
-
             if (activeQueue.length === 0) {
                 container.innerHTML = `<div class="bg-slate-800 border border-slate-700 p-6 rounded-2xl text-sm text-slate-400">No pending deliveries right now.</div>`;
                 return;
@@ -228,7 +227,7 @@
                         <p class="text-xs text-slate-300">${itemsText || 'Parcel'} • <strong class="text-emerald-400 font-mono">₮${formatMNT(o.total)}</strong></p>
                         <p class="text-xs text-slate-400">👤 ${o.customerName || 'Customer'} (${o.customerPhone || '-'})</p>
                         <button onclick="openFocusedOrderScreen('${o.key}')" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl text-xs transition">
-                            🎯 Focus Delivery & Show Order QR
+                            🎯 Start Focused Delivery
                         </button>
                     </div>
                 `;
@@ -238,9 +237,10 @@
         window.openFocusedOrderScreen = async function(orderKey) {
             if (!orderKey || !currentDriver) return;
             focusedOrderKey = orderKey;
+            sessionStorage.setItem(STORAGE_FOCUSED_KEY, orderKey);
 
             const order = allOrders.find(o => o.key === orderKey);
-            if (order && (!order.driverId || order.status === 'Unassigned')) {
+            if (order && order.status !== 'Delivered') {
                 await update(ref(db, `orders/${orderKey}`), {
                     driverId: currentDriver.id,
                     driverName: currentDriver.name,
@@ -252,20 +252,20 @@
             syncFocusedScreenWithOrder();
         };
 
-        window.exitFocusedScreen = function() {
-            document.getElementById('focused-delivery-overlay').classList.add('hidden');
-        };
-
         function syncFocusedScreenWithOrder() {
             if (!focusedOrderKey) return;
-            const overlay = document.getElementById('focused-delivery-overlay');
-            if (overlay.classList.contains('hidden')) return;
-
             const order = allOrders.find(o => o.key === focusedOrderKey);
             if (!order) return;
 
             const isDone = order.status === 'Delivered';
-            lastKnownFocusedStatus = order.status;
+
+            // Keep overlay open whenever a focused order is active or just completed via QR scan
+            if (!isDone) {
+                document.getElementById('focused-delivery-overlay').classList.remove('hidden');
+                document.getElementById('switch-driver-btn').classList.add('hidden');
+            } else {
+                document.getElementById('switch-driver-btn').classList.remove('hidden');
+            }
 
             document.getElementById('focused-active-card').classList.toggle('hidden', isDone);
             document.getElementById('next-delivery-picker').classList.toggle('hidden', !isDone);
@@ -285,8 +285,8 @@
                 qrBox.innerHTML = "";
                 new QRCode(qrBox, {
                     text: qrPayload,
-                    width: 170,
-                    height: 170,
+                    width: 180,
+                    height: 180,
                     correctLevel: QRCode.CorrectLevel.H
                 });
             } else {
@@ -336,17 +336,7 @@
             });
         };
 
-        window.markFocusedDelivered = async function() {
-            if (!focusedOrderKey || !currentDriver) return;
-            await update(ref(db, `orders/${focusedOrderKey}`), {
-                status: 'Delivered',
-                driverId: currentDriver.id,
-                driverName: currentDriver.name,
-                deliveredAt: Date.now()
-            });
-        };
-
-        const savedDriver = sessionStorage.getItem("swiftroute_driver");
+        const savedDriver = sessionStorage.getItem(STORAGE_DRIVER_KEY);
         if (savedDriver) {
             try {
                 currentDriver = JSON.parse(savedDriver);
