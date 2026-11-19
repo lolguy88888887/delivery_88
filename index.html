@@ -167,10 +167,9 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getDatabase, ref, push, onValue, update, set } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+        import { getDatabase, ref, push, onValue, off, update, set, get } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
         import { getFirestore, collection, doc, query, where, getDocs, updateDoc, increment, addDoc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-        // Delivery RTDB config
         const deliveryConfig = {
             apiKey: "AIzaSyBzAlFc53i183dYa56nDFqEROIrJIiBUsg",
             authDomain: "delivery88-fffbf.firebaseapp.com",
@@ -182,7 +181,6 @@
             measurementId: "G-4CE6JWR7SR"
         };
 
-        // Wallet & POS Firestore config
         const walletConfig = {
             apiKey: "AIzaSyA03_nm4Zk3RXmgIxKbxXP-pEGWnzmsQOE",
             authDomain: "pos21-8f88f.firebaseapp.com",
@@ -199,6 +197,9 @@
         const walletApp = initializeApp(walletConfig, "walletApp");
         const walletDb = getFirestore(walletApp);
 
+        const STORAGE_ACCOUNT_KEY = "swiftroute_wallet_account_id";
+        const STORAGE_ORDER_KEY = "swiftroute_active_order_key";
+
         let products = {};
         let cart = [];
         let loggedInWallet = null;
@@ -207,6 +208,7 @@
         let unsubscribeInvoicePayment = null;
 
         let currentTrackKey = null;
+        let activeOrderRef = null;
         let assignedDriverId = null;
         let assignedDriverName = '';
         let selectedRating = 5;
@@ -227,6 +229,65 @@
             }
             renderStore();
         });
+
+        function attachOrderListener(orderKey) {
+            if (!orderKey) return;
+            if (activeOrderRef) {
+                off(activeOrderRef);
+            }
+            currentTrackKey = orderKey;
+            sessionStorage.setItem(STORAGE_ORDER_KEY, orderKey);
+            activeOrderRef = ref(rtdb, `orders/${orderKey}`);
+
+            onValue(activeOrderRef, (snapshot) => {
+                const data = snapshot.val();
+                if (!data) return;
+
+                document.getElementById('active-order-badge').classList.remove('hidden');
+                document.getElementById('tracking-card').classList.remove('hidden');
+                document.getElementById('track-id').innerText = `ORD-${orderKey.slice(-6).toUpperCase()}`;
+                document.getElementById('track-dest').innerText = data.customerAddress || '-';
+                document.getElementById('track-status').innerText = data.status || 'Unassigned';
+                document.getElementById('track-driver').innerText = data.driverName || 'Unassigned';
+                assignedDriverId = data.driverId || null;
+                assignedDriverName = data.driverName || '';
+
+                if (data.status === 'Picked Up' || data.status === 'Assigned') {
+                    document.getElementById('scan-action-box').classList.remove('hidden');
+                } else {
+                    document.getElementById('scan-action-box').classList.add('hidden');
+                }
+            });
+        }
+
+        async function restoreSavedOrderIfAny(accountId) {
+            const savedOrderKey = sessionStorage.getItem(STORAGE_ORDER_KEY);
+            if (savedOrderKey) {
+                const snap = await get(ref(rtdb, `orders/${savedOrderKey}`));
+                if (snap.exists()) {
+                    attachOrderListener(savedOrderKey);
+                    return;
+                }
+                sessionStorage.removeItem(STORAGE_ORDER_KEY);
+            }
+
+            // Fallback: find latest order for this accountId if needed
+            const allOrdersSnap = await get(ref(rtdb, 'orders'));
+            if (allOrdersSnap.exists()) {
+                let latestKey = null;
+                let latestTime = 0;
+                allOrdersSnap.forEach((child) => {
+                    const val = child.val();
+                    if (String(val.customerAccountId || '') === String(accountId) && (val.createdAt || 0) >= latestTime) {
+                        latestTime = val.createdAt || 0;
+                        latestKey = child.key;
+                    }
+                });
+                if (latestKey) {
+                    attachOrderListener(latestKey);
+                }
+            }
+        }
 
         window.startLoginQrScanner = async function() {
             const readerEl = document.getElementById('login-qr-reader');
@@ -277,8 +338,11 @@
             readerEl.classList.add('hidden');
         };
 
-        window.loginWithQrOrId = async function(rawInput) {
-            if (!rawInput || !rawInput.trim()) return alert("Please scan a Wallet QR code or enter an Account ID.");
+        window.loginWithQrOrId = async function(rawInput, isSilentRestore = false) {
+            if (!rawInput || !rawInput.trim()) {
+                if (!isSilentRestore) alert("Please scan a Wallet QR code or enter an Account ID.");
+                return;
+            }
             let accountId = rawInput.trim();
 
             try {
@@ -295,12 +359,15 @@
                 const q = query(collection(walletDb, "accounts"), where("accountId", "==", accountId));
                 const snap = await getDocs(q);
                 if (snap.empty) {
-                    return alert(`Wallet account "${accountId}" not found.`);
+                    sessionStorage.removeItem(STORAGE_ACCOUNT_KEY);
+                    if (!isSilentRestore) alert(`Wallet account "${accountId}" not found.`);
+                    return;
                 }
 
                 const docSnap = snap.docs[0];
                 walletDocRef = docSnap.ref;
                 loggedInWallet = { id: docSnap.id, ...docSnap.data() };
+                sessionStorage.setItem(STORAGE_ACCOUNT_KEY, String(loggedInWallet.accountId));
 
                 document.getElementById('qr-login-view').classList.add('hidden');
                 document.getElementById('storefront-main').classList.remove('hidden');
@@ -315,8 +382,10 @@
                         updateWalletHeaderUI();
                     }
                 });
+
+                await restoreSavedOrderIfAny(loggedInWallet.accountId);
             } catch (err) {
-                alert("Login error: " + err.message);
+                if (!isSilentRestore) alert("Login error: " + err.message);
             }
         };
 
@@ -329,11 +398,21 @@
         window.logoutCustomer = async function() {
             if (unsubscribeWalletDoc) unsubscribeWalletDoc();
             if (unsubscribeInvoicePayment) unsubscribeInvoicePayment();
+            if (activeOrderRef) off(activeOrderRef);
             await stopLoginQrScanner();
+
+            sessionStorage.removeItem(STORAGE_ACCOUNT_KEY);
+            sessionStorage.removeItem(STORAGE_ORDER_KEY);
+
             loggedInWallet = null;
             walletDocRef = null;
+            currentTrackKey = null;
+            activeOrderRef = null;
             cart = [];
             renderCart();
+
+            document.getElementById('active-order-badge').classList.add('hidden');
+            document.getElementById('tracking-card').classList.add('hidden');
             document.getElementById('user-session-bar').classList.add('hidden');
             document.getElementById('user-session-bar').classList.remove('flex');
             document.getElementById('storefront-main').classList.add('hidden');
@@ -440,30 +519,9 @@
                 createdAt: Date.now()
             });
 
-            currentTrackKey = newOrderRef.key;
             cart = [];
             renderCart();
-
-            document.getElementById('active-order-badge').classList.remove('hidden');
-            document.getElementById('tracking-card').classList.remove('hidden');
-            document.getElementById('track-id').innerText = `ORD-${currentTrackKey.slice(-6).toUpperCase()}`;
-            document.getElementById('track-dest').innerText = address;
-
-            onValue(ref(rtdb, `orders/${currentTrackKey}`), (snapshot) => {
-                const data = snapshot.val();
-                if (!data) return;
-                document.getElementById('track-status').innerText = data.status;
-                document.getElementById('track-driver').innerText = data.driverName || 'Unassigned';
-                assignedDriverId = data.driverId;
-                assignedDriverName = data.driverName;
-
-                if (data.status === 'Picked Up' || data.status === 'Assigned') {
-                    document.getElementById('scan-action-box').classList.remove('hidden');
-                }
-                if (data.status === 'Delivered') {
-                    document.getElementById('scan-action-box').classList.add('hidden');
-                }
-            });
+            attachOrderListener(newOrderRef.key);
         }
 
         window.placeOrderWithWallet = async function() {
@@ -619,14 +677,22 @@
         };
 
         window.submitCompletion = function() {
+            if (!currentTrackKey) return;
             update(ref(rtdb, `orders/${currentTrackKey}`), {
                 status: 'Delivered',
                 rating: selectedRating
             }).then(() => {
+                sessionStorage.removeItem(STORAGE_ORDER_KEY);
                 closeDriverScannerModal();
                 alert(`Thank you! Completed with a ${selectedRating}-star rating.`);
             });
         };
+
+        // Restore session & active delivery order automatically on page load / refresh
+        const savedAccountId = sessionStorage.getItem(STORAGE_ACCOUNT_KEY);
+        if (savedAccountId) {
+            window.loginWithQrOrId(savedAccountId, true);
+        }
     </script>
 </body>
 </html>
