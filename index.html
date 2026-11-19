@@ -39,7 +39,7 @@
 
         <div class="border-t pt-4 space-y-3">
             <label class="block text-xs font-semibold uppercase text-slate-500">Or Enter Account ID / QR Code Data</label>
-            <input type="text" id="manual-qr-or-id" placeholder="e.g. 10011 or {&quot;accountId&quot;:&quot;10011&quot;}" class="w-full px-3 py-2 border rounded-lg text-sm font-mono">
+            <input type="text" id="manual-qr-or-id" placeholder='e.g. 10011 or {"accountId":"10011"}' class="w-full px-3 py-2 border rounded-lg text-sm font-mono">
             <button onclick="loginWithQrOrId(document.getElementById('manual-qr-or-id').value)" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-2.5 rounded-xl text-sm transition">
                 Continue with Account ID
             </button>
@@ -124,7 +124,7 @@
         </div>
     </main>
 
-    <!-- Payment QR Generator Modal (Matches POS_INVOICE payload format) -->
+    <!-- Payment QR Generator Modal (Waits for Verified Firestore Payment) -->
     <div id="payment-qr-modal" class="hidden fixed inset-0 bg-slate-950/80 z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl max-w-sm w-full p-6 space-y-4 text-slate-900 text-center shadow-xl">
             <div class="flex justify-between items-center">
@@ -134,9 +134,9 @@
             <p class="text-xs text-slate-500">Scan this QR code with your Wallet scanner to pay:</p>
             <div id="payment-qr-amount" class="text-2xl font-extrabold text-indigo-600">$0.00</div>
             <div id="generated-payment-qr" class="flex justify-center p-3 bg-white border rounded-xl mx-auto w-max"></div>
-            <button onclick="confirmQrPaidAndPlaceOrder()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl text-sm transition">
-                ✓ I Have Paid via QR — Create Order
-            </button>
+            <p class="text-xs font-semibold text-amber-600 animate-pulse">
+                ⌛ Waiting for wallet payment confirmation...
+            </p>
         </div>
     </div>
 
@@ -168,7 +168,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getDatabase, ref, push, onValue, update, set } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
-        import { getFirestore, collection, query, where, getDocs, updateDoc, increment, addDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, collection, doc, query, where, getDocs, updateDoc, increment, addDoc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         // Delivery RTDB config
         const deliveryConfig = {
@@ -182,7 +182,7 @@
             measurementId: "G-4CE6JWR7SR"
         };
 
-        // Wallet & POS Firestore config (from index (25).html & index (23).html)
+        // Wallet & POS Firestore config
         const walletConfig = {
             apiKey: "AIzaSyA03_nm4Zk3RXmgIxKbxXP-pEGWnzmsQOE",
             authDomain: "pos21-8f88f.firebaseapp.com",
@@ -204,14 +204,14 @@
         let loggedInWallet = null;
         let walletDocRef = null;
         let unsubscribeWalletDoc = null;
+        let unsubscribeInvoicePayment = null;
 
         let currentTrackKey = null;
         let assignedDriverId = null;
         let assignedDriverName = '';
         let selectedRating = 5;
-        let loginScanner = null;
-        let driverScanner = null;
-        let pendingInvoiceId = null;
+        let loginQrInstance = null;
+        let driverQrInstance = null;
 
         // Load store products from RTDB
         onValue(ref(rtdb, 'products'), (snapshot) => {
@@ -228,28 +228,63 @@
             renderStore();
         });
 
-        window.startLoginQrScanner = function() {
+        window.startLoginQrScanner = async function() {
             const readerEl = document.getElementById('login-qr-reader');
             readerEl.classList.remove('hidden');
-            if (loginScanner) loginScanner.clear().catch(() => {});
-            loginScanner = new Html5QrcodeScanner("login-qr-reader", { fps: 10, qrbox: 220 });
-            loginScanner.render((decodedText) => {
-                loginScanner.clear().catch(() => {});
-                readerEl.classList.add('hidden');
-                window.loginWithQrOrId(decodedText);
-            }, () => {});
+            readerEl.innerHTML = `<p class="text-xs text-slate-500 p-3 text-center">Starting camera...</p>`;
+
+            try {
+                if (loginQrInstance) {
+                    if (loginQrInstance.isScanning) await loginQrInstance.stop();
+                    await loginQrInstance.clear();
+                    loginQrInstance = null;
+                }
+
+                const cameras = await Html5Qrcode.getCameras();
+                if (!cameras || cameras.length === 0) {
+                    readerEl.innerHTML = `<p class="text-xs text-red-500 p-3 text-center">No camera found on this device.</p>`;
+                    return;
+                }
+
+                const backCam = cameras.find(c => /back|rear|environment/i.test(c.label));
+                const cameraId = backCam ? backCam.id : cameras[0].id;
+
+                loginQrInstance = new Html5Qrcode("login-qr-reader");
+                await loginQrInstance.start(
+                    cameraId,
+                    { fps: 10, qrbox: { width: 220, height: 220 } },
+                    async (decodedText) => {
+                        await stopLoginQrScanner();
+                        window.loginWithQrOrId(decodedText);
+                    },
+                    () => {}
+                );
+            } catch (err) {
+                console.error("Login camera error:", err);
+                readerEl.innerHTML = `<p class="text-xs text-red-500 p-3 text-center">Camera error: ${err.message || err}</p>`;
+            }
+        };
+
+        window.stopLoginQrScanner = async function() {
+            const readerEl = document.getElementById('login-qr-reader');
+            if (loginQrInstance) {
+                try {
+                    if (loginQrInstance.isScanning) await loginQrInstance.stop();
+                    await loginQrInstance.clear();
+                } catch (_) {}
+                loginQrInstance = null;
+            }
+            readerEl.classList.add('hidden');
         };
 
         window.loginWithQrOrId = async function(rawInput) {
             if (!rawInput || !rawInput.trim()) return alert("Please scan a Wallet QR code or enter an Account ID.");
             let accountId = rawInput.trim();
 
-            // Support JSON payloads like {"type":"CUSTOMER_WALLET","accountId":"10011"} or {"accountId":"10011"}
             try {
                 const parsed = JSON.parse(accountId);
                 if (parsed.accountId) accountId = String(parsed.accountId);
             } catch (_) {
-                // Support colon-delimited strings like CUSTOMER_WALLET:10011:Alex
                 if (accountId.includes(":")) {
                     const parts = accountId.split(":");
                     if (parts[1]) accountId = parts[1].trim();
@@ -291,9 +326,10 @@
             document.getElementById('nav-wallet-balance').innerText = Number(loggedInWallet.balance || 0).toFixed(2);
         }
 
-        window.logoutCustomer = function() {
+        window.logoutCustomer = async function() {
             if (unsubscribeWalletDoc) unsubscribeWalletDoc();
-            if (loginScanner) loginScanner.clear().catch(() => {});
+            if (unsubscribeInvoicePayment) unsubscribeInvoicePayment();
+            await stopLoginQrScanner();
             loggedInWallet = null;
             walletDocRef = null;
             cart = [];
@@ -374,7 +410,7 @@
             return true;
         }
 
-        async function createDeliveryAndReceipt(totalAmount, invoiceId, paymentMethodLabel) {
+        async function createDeliveryAndReceipt(itemsSnapshot, totalAmount, invoiceId, paymentMethodLabel) {
             const address = document.getElementById('cust-address').value.trim();
             const phone = document.getElementById('cust-phone').value.trim();
 
@@ -384,7 +420,7 @@
                 customerAccountId: String(loggedInWallet.accountId),
                 customerAddress: address,
                 customerPhone: phone,
-                items: cart,
+                items: itemsSnapshot,
                 total: totalAmount,
                 paymentMethod: paymentMethodLabel,
                 invoiceId: invoiceId,
@@ -400,7 +436,7 @@
                 accountId: String(loggedInWallet.accountId),
                 invoiceId: String(invoiceId),
                 amount: totalAmount,
-                items: cart,
+                items: itemsSnapshot,
                 createdAt: Date.now()
             });
 
@@ -432,7 +468,8 @@
 
         window.placeOrderWithWallet = async function() {
             if (!validateCheckoutInputs()) return;
-            const totalAmount = cart.reduce((sum, i) => sum + Number(i.price), 0);
+            const itemsSnapshot = [...cart];
+            const totalAmount = itemsSnapshot.reduce((sum, i) => sum + Number(i.price), 0);
             const currentBal = Number(loggedInWallet.balance || 0);
             if (currentBal < totalAmount) {
                 return alert(`Insufficient wallet balance ($${currentBal.toFixed(2)}) for $${totalAmount.toFixed(2)}.`);
@@ -445,17 +482,19 @@
                     lastChargeTimestamp: Date.now(),
                     lastChargeAmount: totalAmount
                 });
-                await createDeliveryAndReceipt(totalAmount, invoiceId, "Wallet Balance");
+                await createDeliveryAndReceipt(itemsSnapshot, totalAmount, invoiceId, "Wallet Balance");
                 alert(`Order placed! Paid $${totalAmount.toFixed(2)} from Wallet.`);
             } catch (err) {
                 alert("Payment failed: " + err.message);
             }
         };
 
-        window.openPaymentQrModal = function() {
+        window.openPaymentQrModal = async function() {
             if (!validateCheckoutInputs()) return;
-            const totalAmount = cart.reduce((sum, i) => sum + Number(i.price), 0);
-            pendingInvoiceId = "INV_" + Date.now();
+
+            const itemsSnapshot = [...cart];
+            const totalAmount = itemsSnapshot.reduce((sum, i) => sum + Number(i.price), 0);
+            const invoiceId = "INV_" + Date.now();
 
             document.getElementById('payment-qr-amount').innerText = `$${totalAmount.toFixed(2)}`;
             const qrContainer = document.getElementById('generated-payment-qr');
@@ -463,48 +502,110 @@
             new QRCode(qrContainer, {
                 text: JSON.stringify({
                     type: "POS_INVOICE",
-                    invoiceId: pendingInvoiceId,
+                    invoiceId: invoiceId,
                     amount: totalAmount
                 }),
                 width: 180,
                 height: 180,
                 correctLevel: QRCode.CorrectLevel.H
             });
+
             document.getElementById('payment-qr-modal').classList.remove('hidden');
+
+            const invoiceRef = doc(walletDb, "delivery_invoices", invoiceId);
+            await setDoc(invoiceRef, {
+                invoiceId: invoiceId,
+                amount: totalAmount,
+                customerAccountId: String(loggedInWallet.accountId),
+                status: "PENDING",
+                createdAt: Date.now()
+            });
+
+            if (unsubscribeInvoicePayment) unsubscribeInvoicePayment();
+            let orderCreated = false;
+
+            unsubscribeInvoicePayment = onSnapshot(invoiceRef, async (snap) => {
+                if (!snap.exists() || orderCreated) return;
+                const data = snap.data();
+
+                if (data.status === "COMPLETED") {
+                    orderCreated = true;
+                    if (unsubscribeInvoicePayment) {
+                        unsubscribeInvoicePayment();
+                        unsubscribeInvoicePayment = null;
+                    }
+                    document.getElementById('payment-qr-modal').classList.add('hidden');
+                    await createDeliveryAndReceipt(itemsSnapshot, totalAmount, invoiceId, "Wallet QR (Verified)");
+                    alert(`Payment verified! Order placed for $${totalAmount.toFixed(2)}.`);
+                }
+            });
         };
 
         window.closePaymentQrModal = function() {
+            if (unsubscribeInvoicePayment) {
+                unsubscribeInvoicePayment();
+                unsubscribeInvoicePayment = null;
+            }
             document.getElementById('payment-qr-modal').classList.add('hidden');
         };
 
-        window.confirmQrPaidAndPlaceOrder = async function() {
-            const totalAmount = cart.reduce((sum, i) => sum + Number(i.price), 0);
+        window.openDriverScannerModal = async function() {
+            const readerEl = document.getElementById('reader');
+            readerEl.style.display = 'block';
+            readerEl.innerHTML = `<p class="text-xs text-slate-500 p-3 text-center">Starting camera...</p>`;
+            document.getElementById('rating-section').classList.add('hidden');
+            document.getElementById('qr-modal').classList.remove('hidden');
+
             try {
-                await createDeliveryAndReceipt(totalAmount, pendingInvoiceId || ("INV_" + Date.now()), "Wallet QR");
-                closePaymentQrModal();
-                alert("Delivery order placed!");
+                if (driverQrInstance) {
+                    if (driverQrInstance.isScanning) await driverQrInstance.stop();
+                    await driverQrInstance.clear();
+                    driverQrInstance = null;
+                }
+
+                const cameras = await Html5Qrcode.getCameras();
+                if (!cameras || cameras.length === 0) {
+                    readerEl.innerHTML = `<p class="text-xs text-red-500 p-3 text-center">No camera found on this device.</p>`;
+                    return;
+                }
+
+                const backCam = cameras.find(c => /back|rear|environment/i.test(c.label));
+                const cameraId = backCam ? backCam.id : cameras[0].id;
+
+                driverQrInstance = new Html5Qrcode("reader");
+                await driverQrInstance.start(
+                    cameraId,
+                    { fps: 10, qrbox: { width: 220, height: 220 } },
+                    async (decodedText) => {
+                        if ((assignedDriverId && decodedText.includes(assignedDriverId)) || decodedText.length > 5) {
+                            await stopDriverScanner();
+                            readerEl.style.display = 'none';
+                            document.getElementById('scanned-driver-name').innerText = assignedDriverName || 'Verified Courier';
+                            document.getElementById('rating-section').classList.remove('hidden');
+                        } else {
+                            alert('Invalid driver QR code.');
+                        }
+                    },
+                    () => {}
+                );
             } catch (err) {
-                alert("Error creating order: " + err.message);
+                console.error("Driver camera error:", err);
+                readerEl.innerHTML = `<p class="text-xs text-red-500 p-3 text-center">Camera error: ${err.message || err}</p>`;
             }
         };
 
-        window.openDriverScannerModal = function() {
-            document.getElementById('qr-modal').classList.remove('hidden');
-            driverScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 });
-            driverScanner.render((decodedText) => {
-                if (decodedText.includes(assignedDriverId) || decodedText.length > 5) {
-                    driverScanner.clear();
-                    document.getElementById('reader').style.display = 'none';
-                    document.getElementById('scanned-driver-name').innerText = assignedDriverName;
-                    document.getElementById('rating-section').classList.remove('hidden');
-                } else {
-                    alert('Invalid driver QR code.');
-                }
-            }, () => {});
-        };
+        async function stopDriverScanner() {
+            if (driverQrInstance) {
+                try {
+                    if (driverQrInstance.isScanning) await driverQrInstance.stop();
+                    await driverQrInstance.clear();
+                } catch (_) {}
+                driverQrInstance = null;
+            }
+        }
 
-        window.closeDriverScannerModal = function() {
-            if (driverScanner) driverScanner.clear().catch(() => {});
+        window.closeDriverScannerModal = async function() {
+            await stopDriverScanner();
             document.getElementById('qr-modal').classList.add('hidden');
             document.getElementById('reader').style.display = 'block';
             document.getElementById('rating-section').classList.add('hidden');
