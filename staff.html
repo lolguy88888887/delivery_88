@@ -33,22 +33,22 @@
                 <input type="text" id="driver-id-input" placeholder="e.g. DRV-01" class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-sm text-white font-mono">
             </div>
             <button onclick="loginCourier()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl text-sm transition">
-                Enter Delivery Queue
+                Enter Assigned Deliveries
             </button>
         </div>
     </div>
 
-    <!-- Queue Dashboard -->
+    <!-- Assigned Queue Dashboard -->
     <main id="courier-dashboard" class="hidden max-w-5xl mx-auto px-4 py-6 space-y-6">
         <div class="flex justify-between items-center">
             <div>
-                <h2 class="text-xl font-bold text-white">Active Delivery Queue</h2>
-                <p class="text-xs text-slate-400">Tap "Start Focused Delivery" to lock into an address & order QR</p>
+                <h2 class="text-xl font-bold text-white">Your Assigned Deliveries</h2>
+                <p class="text-xs text-slate-400">Orders assigned to you by Dispatch</p>
             </div>
         </div>
 
         <div id="staff-orders-list" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <p class="text-slate-400 text-sm">Loading orders...</p>
+            <p class="text-slate-400 text-sm">Loading assigned deliveries...</p>
         </div>
     </main>
 
@@ -102,16 +102,16 @@
             </div>
         </div>
 
-        <!-- "CHOOSE WHO IS NEXT" PICKER (Shown Automatically After Customer Scans QR) -->
+        <!-- "CHOOSE WHO IS NEXT" PICKER (Assigned Orders Only) -->
         <div id="next-delivery-picker" class="hidden max-w-2xl w-full mx-auto bg-slate-900 border border-emerald-500/40 rounded-3xl p-6 sm:p-8 space-y-5 shadow-2xl">
             <div class="text-center border-b border-slate-800 pb-4">
                 <div class="w-12 h-12 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-2xl mx-auto mb-2">✓</div>
                 <h3 class="text-xl font-extrabold text-white">QR Verified & Delivered!</h3>
-                <p class="text-xs text-slate-400 mt-1">Choose who is next to deliver:</p>
+                <p class="text-xs text-slate-400 mt-1">Choose your next assigned delivery:</p>
             </div>
 
             <div id="next-orders-choices" class="space-y-3">
-                <!-- Populated dynamically with remaining orders -->
+                <!-- Populated dynamically with assigned undelivered orders -->
             </div>
         </div>
     </div>
@@ -145,6 +145,14 @@
             return Number(amount || 0).toLocaleString();
         }
 
+        function getMyAssignedOrders() {
+            if (!currentDriver) return [];
+            return allOrders.filter(o =>
+                String(o.driverId || '').trim() === String(currentDriver.id).trim() &&
+                o.status !== 'Delivered'
+            );
+        }
+
         window.loginCourier = function() {
             const name = document.getElementById('driver-name-input').value.trim();
             const id = document.getElementById('driver-id-input').value.trim();
@@ -155,7 +163,6 @@
         };
 
         window.logoutCourier = function() {
-            // Prevent switching/logging out while locked in a focused delivery
             const activeFocused = allOrders.find(o => o.key === focusedOrderKey && o.status !== 'Delivered');
             if (activeFocused) {
                 return alert("You cannot exit while an active focused delivery is in progress. The customer must scan the order QR first.");
@@ -206,14 +213,14 @@
 
         function renderQueue() {
             const container = document.getElementById('staff-orders-list');
-            const activeQueue = allOrders.filter(o => o.status !== 'Delivered');
+            const myAssigned = getMyAssignedOrders();
 
-            if (activeQueue.length === 0) {
-                container.innerHTML = `<div class="bg-slate-800 border border-slate-700 p-6 rounded-2xl text-sm text-slate-400">No pending deliveries right now.</div>`;
+            if (myAssigned.length === 0) {
+                container.innerHTML = `<div class="bg-slate-800 border border-slate-700 p-6 rounded-2xl text-sm text-slate-400">No deliveries assigned to you by Dispatch right now.</div>`;
                 return;
             }
 
-            container.innerHTML = activeQueue.map((o) => {
+            container.innerHTML = myAssigned.map((o) => {
                 const itemsText = (o.items || []).map(i => `${i.name} ×${i.quantity || 1}`).join(', ');
                 return `
                     <div class="bg-slate-800 border border-slate-700 p-5 rounded-2xl space-y-3">
@@ -222,7 +229,7 @@
                                 <span class="font-mono text-xs font-bold text-indigo-400">ORD-${o.key.slice(-6).toUpperCase()}</span>
                                 <h3 class="text-base font-bold text-white mt-0.5">📍 ${o.customerAddress || 'No address'}</h3>
                             </div>
-                            <span class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-400 text-slate-900">${o.status || 'Unassigned'}</span>
+                            <span class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-400 text-slate-900">${o.status || 'Assigned'}</span>
                         </div>
                         <p class="text-xs text-slate-300">${itemsText || 'Parcel'} • <strong class="text-emerald-400 font-mono">₮${formatMNT(o.total)}</strong></p>
                         <p class="text-xs text-slate-400">👤 ${o.customerName || 'Customer'} (${o.customerPhone || '-'})</p>
@@ -236,15 +243,17 @@
 
         window.openFocusedOrderScreen = async function(orderKey) {
             if (!orderKey || !currentDriver) return;
+            const order = allOrders.find(o => o.key === orderKey);
+            if (!order || String(order.driverId || '').trim() !== String(currentDriver.id).trim()) {
+                return alert("This order is not assigned to your Courier ID.");
+            }
+
             focusedOrderKey = orderKey;
             sessionStorage.setItem(STORAGE_FOCUSED_KEY, orderKey);
 
-            const order = allOrders.find(o => o.key === orderKey);
-            if (order && order.status !== 'Delivered') {
+            if (order.status !== 'Delivered') {
                 await update(ref(db, `orders/${orderKey}`), {
-                    driverId: currentDriver.id,
-                    driverName: currentDriver.name,
-                    status: order.status === 'Unassigned' ? 'Assigned' : order.status
+                    driverName: currentDriver.name
                 });
             }
 
@@ -253,17 +262,17 @@
         };
 
         function syncFocusedScreenWithOrder() {
-            if (!focusedOrderKey) return;
+            if (!focusedOrderKey || !currentDriver) return;
             const order = allOrders.find(o => o.key === focusedOrderKey);
             if (!order) return;
 
             const isDone = order.status === 'Delivered';
 
-            // Keep overlay open whenever a focused order is active or just completed via QR scan
             if (!isDone) {
                 document.getElementById('focused-delivery-overlay').classList.remove('hidden');
                 document.getElementById('switch-driver-btn').classList.add('hidden');
             } else {
+                sessionStorage.removeItem(STORAGE_FOCUSED_KEY);
                 document.getElementById('switch-driver-btn').classList.remove('hidden');
             }
 
@@ -296,14 +305,14 @@
 
         function renderNextDeliveryChoices(justFinishedKey) {
             const choicesContainer = document.getElementById('next-orders-choices');
-            const remaining = allOrders.filter(o => o.status !== 'Delivered' && o.key !== justFinishedKey);
+            const remainingAssigned = getMyAssignedOrders().filter(o => o.key !== justFinishedKey);
 
-            if (remaining.length === 0) {
-                choicesContainer.innerHTML = `<div class="bg-slate-950 border border-slate-800 p-4 rounded-2xl text-center text-sm text-emerald-400 font-semibold">🎉 All deliveries in the queue are completed!</div>`;
+            if (remainingAssigned.length === 0) {
+                choicesContainer.innerHTML = `<div class="bg-slate-950 border border-slate-800 p-4 rounded-2xl text-center text-sm text-emerald-400 font-semibold">🎉 All of your assigned deliveries are completed!</div>`;
                 return;
             }
 
-            choicesContainer.innerHTML = remaining.map((o) => {
+            choicesContainer.innerHTML = remainingAssigned.map((o) => {
                 const itemsText = (o.items || []).map(i => `${i.name} ×${i.quantity || 1}`).join(', ');
                 return `
                     <div class="bg-slate-950 border border-slate-800 hover:border-indigo-500 p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition">
