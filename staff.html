@@ -3,90 +3,136 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SwiftRoute | Delivery Staff Portal</title>
+    <title>SwiftRoute | Courier & Staff Delivery Portal</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
-<body class="bg-slate-50 text-slate-800 min-h-screen">
-    <!-- Header -->
-    <header class="bg-slate-900 text-white shadow-md sticky top-0 z-50">
-        <div class="max-w-4xl mx-auto px-4 py-4 flex justify-between items-center">
-            <h1 class="text-xl font-bold flex items-center gap-2">🏍️ Courier Portal</h1>
-            <div id="driver-profile-nav" class="hidden items-center gap-3 text-sm">
-                <span>👤 <strong id="nav-drivername">Courier</strong></span>
-                <button onclick="logoutDriver()" class="text-xs text-slate-400 hover:text-white underline">Logout</button>
+<body class="bg-slate-900 text-slate-100 min-h-screen">
+
+    <!-- Top Bar -->
+    <header class="bg-slate-950 border-b border-slate-800 sticky top-0 z-30">
+        <div class="max-w-5xl mx-auto px-4 py-3.5 flex justify-between items-center">
+            <h1 class="text-lg font-bold text-indigo-400">🏍️ SwiftRoute Courier</h1>
+            <div id="staff-session-info" class="hidden items-center gap-3 text-xs">
+                <span class="bg-slate-800 px-3 py-1.5 rounded-xl font-semibold">👤 <span id="active-driver-label">Courier</span></span>
+                <button onclick="logoutCourier()" class="text-rose-400 hover:text-rose-300 font-semibold">Switch</button>
             </div>
         </div>
     </header>
 
-    <!-- Courier Login / Signup View -->
-    <div id="auth-container" class="max-w-md mx-auto mt-16 bg-white p-8 rounded-2xl shadow-sm border border-slate-200 space-y-6">
-        <div class="text-center">
-            <h2 class="text-2xl font-bold text-slate-900">Courier Portal Sign In</h2>
-            <p class="text-xs text-slate-500 mt-1">Access your assigned routes & delivery QR code</p>
-        </div>
-
-        <!-- Tabs -->
-        <div class="flex border-b text-sm font-semibold">
-            <button onclick="switchAuthTab('login')" id="tab-login" class="flex-1 pb-2 border-b-2 border-indigo-600 text-indigo-600">Login</button>
-            <button onclick="switchAuthTab('signup')" id="tab-signup" class="flex-1 pb-2 text-slate-400 border-b-2 border-transparent">Register Courier</button>
-        </div>
-
-        <!-- Login Form -->
-        <div id="form-login" class="space-y-4">
+    <!-- Courier Login / Select -->
+    <div id="courier-login-view" class="max-w-md mx-auto mt-12 px-4">
+        <div class="bg-slate-800 border border-slate-700 p-6 rounded-2xl space-y-4">
+            <h2 class="text-xl font-bold text-white">Courier Sign In</h2>
             <div>
-                <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Email or Phone</label>
-                <input type="text" id="login-identifier" placeholder="Enter your email or phone" class="w-full px-3 py-2 border rounded-lg text-sm">
-            </div>
-            <button onclick="loginDriver()" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-2.5 rounded-xl text-sm transition">Sign In as Courier</button>
-        </div>
-
-        <!-- Signup Form -->
-        <div id="form-signup" class="space-y-4 hidden">
-            <div>
-                <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Full Name</label>
-                <input type="text" id="signup-name" placeholder="Alex Rivera" class="w-full px-3 py-2 border rounded-lg text-sm">
+                <label class="block text-xs uppercase text-slate-400 font-semibold mb-1">Your Name</label>
+                <input type="text" id="driver-name-input" placeholder="e.g. Batbayar" class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-sm text-white">
             </div>
             <div>
-                <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Phone Number</label>
-                <input type="text" id="signup-phone" placeholder="+976 ..." class="w-full px-3 py-2 border rounded-lg text-sm">
+                <label class="block text-xs uppercase text-slate-400 font-semibold mb-1">Courier ID</label>
+                <input type="text" id="driver-id-input" placeholder="e.g. DRV-01" class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-sm text-white font-mono">
             </div>
-            <div>
-                <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Email (Login ID)</label>
-                <input type="email" id="signup-email" placeholder="alex@swiftroute.com" class="w-full px-3 py-2 border rounded-lg text-sm">
-            </div>
-            <button onclick="signupDriver()" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-2.5 rounded-xl text-sm transition">Register & Go Online</button>
+            <button onclick="loginCourier()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl text-sm transition">
+                Enter Delivery Queue
+            </button>
         </div>
     </div>
 
-    <!-- Main Courier Dashboard (Hidden until logged in) -->
-    <main id="dashboard-container" class="hidden max-w-4xl mx-auto px-4 py-8 grid grid-cols-1 md:grid-cols-3 gap-6">
-        <!-- Profile & QR Code Card -->
-        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 text-center space-y-4">
-            <h3 class="font-bold text-slate-900 text-lg" id="driver-display-name">-</h3>
-            <span class="inline-block bg-emerald-100 text-emerald-800 text-xs px-3 py-1 rounded-full font-bold">Online & Ready</span>
-            <div class="bg-slate-50 p-4 rounded-xl flex flex-col items-center justify-center space-y-2">
-                <p class="text-xs text-slate-500 font-semibold uppercase">Your Delivery QR</p>
-                <div id="qrcode" class="bg-white p-2 rounded-lg border flex justify-center"></div>
-                <p class="text-[10px] text-slate-400">Customer scans this upon delivery</p>
+    <!-- Queue Dashboard -->
+    <main id="courier-dashboard" class="hidden max-w-5xl mx-auto px-4 py-6 space-y-6">
+        <div class="flex justify-between items-center">
+            <div>
+                <h2 class="text-xl font-bold text-white">Active Delivery Queue</h2>
+                <p class="text-xs text-slate-400">Tap "Focus Delivery" to open full-screen address & order QR</p>
             </div>
+            <button id="resume-focus-btn" onclick="openFocusedOrderScreen(focusedOrderKey)" class="hidden bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2 rounded-xl text-xs">
+                🎯 Resume Active Delivery
+            </button>
         </div>
 
-        <!-- Assigned Deliveries -->
-        <div class="md:col-span-2 space-y-4">
-            <h2 class="text-lg font-bold text-slate-900">📋 Assigned Deliveries</h2>
-            <div id="task-list" class="space-y-4">
-                <p class="text-slate-400 text-sm">Loading assigned deliveries...</p>
-            </div>
+        <div id="staff-orders-list" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <p class="text-slate-400 text-sm">Loading orders...</p>
         </div>
     </main>
 
-    <!-- Firebase SDKs & Logic -->
+    <!-- FULL-SCREEN FOCUSED DELIVERY VIEW -->
+    <div id="focused-delivery-overlay" class="hidden fixed inset-0 bg-slate-950 z-50 overflow-y-auto p-4 sm:p-8 flex flex-col justify-between">
+        
+        <!-- Active Delivery Card -->
+        <div id="focused-active-card" class="max-w-2xl w-full mx-auto bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-4">
+                <div>
+                    <span class="text-xs uppercase tracking-widest text-indigo-400 font-bold">Focused Delivery</span>
+                    <h2 id="focus-order-id" class="text-2xl font-extrabold text-white mt-0.5">ORD-XXXXXX</h2>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span id="focus-status-badge" class="px-3 py-1 rounded-full text-xs font-bold bg-amber-400 text-slate-900">Picked Up</span>
+                    <button onclick="exitFocusedScreen()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-xl text-xs font-semibold">
+                        Queue ✕
+                    </button>
+                </div>
+            </div>
+
+            <!-- Prominent Delivery Address -->
+            <div class="bg-indigo-950/60 border border-indigo-500/30 rounded-2xl p-5 space-y-1.5">
+                <p class="text-xs uppercase tracking-wider text-indigo-300 font-bold">📍 Delivery Address</p>
+                <p id="focus-address" class="text-xl sm:text-2xl font-extrabold text-white leading-snug">-</p>
+                <p class="text-sm text-slate-300 pt-1">
+                    👤 <strong id="focus-customer">-</strong> • 📞 <span id="focus-phone" class="font-mono">-</span>
+                </p>
+            </div>
+
+            <!-- Order Items & Total -->
+            <div class="bg-slate-950/70 border border-slate-800 rounded-2xl p-4 space-y-2 text-sm">
+                <p class="text-xs uppercase text-slate-400 font-bold">Items & Total</p>
+                <p id="focus-items" class="text-slate-200">-</p>
+                <div class="pt-2 border-t border-slate-800 flex justify-between font-bold text-base">
+                    <span class="text-slate-400">Order Total:</span>
+                    <span id="focus-total" class="text-emerald-400 font-mono">₮0</span>
+                </div>
+            </div>
+
+            <!-- Unique QR Code for THIS Specific Order -->
+            <div class="bg-white text-slate-900 rounded-2xl p-5 text-center space-y-2">
+                <p class="text-xs font-extrabold uppercase tracking-wider text-slate-500">Show This Order's QR to Customer</p>
+                <div id="focus-order-qr-box" class="flex justify-center py-2"></div>
+                <p id="focus-qr-payload-text" class="text-[11px] font-mono text-slate-500 break-all"></p>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <button id="focus-pickup-btn" onclick="markFocusedPickedUp()" class="bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold py-3.5 rounded-2xl text-sm transition">
+                    🏍️ Mark Picked Up / En Route
+                </button>
+                <button onclick="markFocusedDelivered()" class="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-extrabold py-3.5 rounded-2xl text-sm transition">
+                    ✓ Complete Delivery
+                </button>
+            </div>
+        </div>
+
+        <!-- "CHOOSE WHO IS NEXT" PICKER (Shown After Current Delivery Is Done) -->
+        <div id="next-delivery-picker" class="hidden max-w-2xl w-full mx-auto bg-slate-900 border border-emerald-500/40 rounded-3xl p-6 sm:p-8 space-y-5 shadow-2xl">
+            <div class="text-center border-b border-slate-800 pb-4">
+                <div class="w-12 h-12 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-2xl mx-auto mb-2">✓</div>
+                <h3 class="text-xl font-extrabold text-white">Delivery Completed!</h3>
+                <p class="text-xs text-slate-400 mt-1">Choose which order you want to deliver next:</p>
+            </div>
+
+            <div id="next-orders-choices" class="space-y-3">
+                <!-- Populated dynamically with remaining orders -->
+            </div>
+
+            <button onclick="exitFocusedScreen()" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold py-3 rounded-2xl text-sm transition">
+                Back to Full Queue
+            </button>
+        </div>
+    </div>
+
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getDatabase, ref, push, onValue, update, set, get } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+        import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
-        const firebaseConfig = {
+        const deliveryConfig = {
             apiKey: "AIzaSyBzAlFc53i183dYa56nDFqEROIrJIiBUsg",
             authDomain: "delivery88-fffbf.firebaseapp.com",
             databaseURL: "https://delivery88-fffbf-default-rtdb.firebaseio.com",
@@ -97,138 +143,217 @@
             measurementId: "G-4CE6JWR7SR"
         };
 
-        const app = initializeApp(firebaseConfig);
+        const app = initializeApp(deliveryConfig);
         const db = getDatabase(app);
 
-        let currentDriverKey = null;
-        let currentDriverData = null;
-        let orders = {};
+        let allOrders = [];
+        let currentDriver = null;
+        let focusedOrderKey = null;
+        let lastKnownFocusedStatus = null;
 
-        window.switchAuthTab = function(tab) {
-            if(tab === 'login') {
-                document.getElementById('form-login').classList.remove('hidden');
-                document.getElementById('form-signup').classList.add('hidden');
-                document.getElementById('tab-login').className = "flex-1 pb-2 border-b-2 border-indigo-600 text-indigo-600 font-semibold";
-                document.getElementById('tab-signup').className = "flex-1 pb-2 text-slate-400 border-b-2 border-transparent";
-            } else {
-                document.getElementById('form-signup').classList.remove('hidden');
-                document.getElementById('form-login').classList.add('hidden');
-                document.getElementById('tab-signup').className = "flex-1 pb-2 border-b-2 border-indigo-600 text-indigo-600 font-semibold";
-                document.getElementById('tab-login').className = "flex-1 pb-2 text-slate-400 border-b-2 border-transparent";
-            }
+        function formatMNT(amount) {
+            return Number(amount || 0).toLocaleString();
         }
 
-        window.signupDriver = function() {
-            const name = document.getElementById('signup-name').value.trim();
-            const phone = document.getElementById('signup-phone').value.trim();
-            const email = document.getElementById('signup-email').value.trim().toLowerCase();
-            if(!name || !phone || !email) return alert('Please fill in all courier registration fields.');
+        window.loginCourier = function() {
+            const name = document.getElementById('driver-name-input').value.trim();
+            const id = document.getElementById('driver-id-input').value.trim();
+            if (!name || !id) return alert("Enter both your Courier Name and Courier ID.");
+            currentDriver = { name, id };
+            sessionStorage.setItem("swiftroute_driver", JSON.stringify(currentDriver));
+            showDashboard();
+        };
 
-            const newDriverRef = push(ref(db, 'drivers'));
-            const driverData = { name, phone, email, status: 'Online' };
+        window.logoutCourier = function() {
+            sessionStorage.removeItem("swiftroute_driver");
+            currentDriver = null;
+            focusedOrderKey = null;
+            document.getElementById('focused-delivery-overlay').classList.add('hidden');
+            document.getElementById('courier-dashboard').classList.add('hidden');
+            document.getElementById('staff-session-info').classList.add('hidden');
+            document.getElementById('courier-login-view').classList.remove('hidden');
+        };
 
-            set(newDriverRef, driverData).then(() => {
-                loginSuccess(newDriverRef.key, driverData);
-            }).catch(e => alert('Error registering: ' + e.message));
+        function showDashboard() {
+            document.getElementById('courier-login-view').classList.add('hidden');
+            document.getElementById('courier-dashboard').classList.remove('hidden');
+            document.getElementById('staff-session-info').classList.remove('hidden');
+            document.getElementById('staff-session-info').classList.add('flex');
+            document.getElementById('active-driver-label').innerText = `${currentDriver.name} (${currentDriver.id})`;
+            renderQueue();
         }
 
-        window.loginDriver = function() {
-            const identifier = document.getElementById('login-identifier').value.trim().toLowerCase();
-            if(!identifier) return alert('Please enter your email or phone.');
-
-            get(ref(db, 'drivers')).then((snapshot) => {
-                if(!snapshot.exists()) return alert('No courier accounts found. Please register.');
-                let foundKey = null;
-                let foundData = null;
-
-                snapshot.forEach((childSnap) => {
-                    const d = childSnap.val();
-                    if(d.email === identifier || d.phone === identifier || d.name.toLowerCase() === identifier) {
-                        foundKey = childSnap.key;
-                        foundData = d;
-                    }
+        onValue(ref(db, 'orders'), (snapshot) => {
+            const list = [];
+            if (snapshot.exists()) {
+                snapshot.forEach((child) => {
+                    const val = child.val();
+                    const qrCode = val.orderQrCode || `DELIVERY_ORDER:${child.key}`;
+                    list.push({ key: child.key, orderQrCode: qrCode, ...val });
                 });
-
-                if(foundKey && foundData) {
-                    // Ensure driver is marked online upon login
-                    update(ref(db, `drivers/${foundKey}`), { status: 'Online' });
-                    loginSuccess(foundKey, { ...foundData, status: 'Online' });
-                } else {
-                    alert('Courier account not found. Please register first.');
-                }
-            });
-        }
-
-        function loginSuccess(key, driver) {
-            currentDriverKey = key;
-            currentDriverData = driver;
-            document.getElementById('auth-container').classList.add('hidden');
-            document.getElementById('dashboard-container').classList.remove('hidden');
-            document.getElementById('driver-profile-nav').classList.remove('hidden');
-            document.getElementById('nav-drivername').innerText = driver.name;
-            document.getElementById('driver-display-name').innerText = driver.name;
-
-            // Generate Personal QR Code
-            document.getElementById('qrcode').innerHTML = "";
-            new QRCode(document.getElementById("qrcode"), {
-                text: `DRIVER_ID:${currentDriverKey}:${driver.name}`,
-                width: 140,
-                height: 140
-            });
-
-            startListeningOrders();
-        }
-
-        window.logoutDriver = function() {
-            if(currentDriverKey) {
-                update(ref(db, `drivers/${currentDriverKey}`), { status: 'Offline' });
             }
-            currentDriverKey = null;
-            currentDriverData = null;
-            document.getElementById('auth-container').classList.remove('hidden');
-            document.getElementById('dashboard-container').classList.add('hidden');
-            document.getElementById('driver-profile-nav').classList.add('hidden');
-        }
+            list.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+            allOrders = list;
 
-        function startListeningOrders() {
-            onValue(ref(db, 'orders'), (snapshot) => {
-                orders = snapshot.val() || {};
-                renderTasks();
-            });
-        }
+            if (currentDriver) {
+                renderQueue();
+                syncFocusedScreenWithOrder();
+            }
+        });
 
-        window.renderTasks = function() {
-            if(!currentDriverKey) return;
-            const container = document.getElementById('task-list');
-            const myOrders = Object.entries(orders).filter(([_, o]) => o.driverId === currentDriverKey && o.status !== 'Delivered');
+        function renderQueue() {
+            const container = document.getElementById('staff-orders-list');
+            const activeQueue = allOrders.filter(o => o.status !== 'Delivered');
 
-            if(myOrders.length === 0) {
-                return container.innerHTML = `<div class="bg-white p-6 rounded-2xl border text-center text-slate-500 text-sm">No active delivery tasks assigned to you right now.</div>`;
+            const resumeBtn = document.getElementById('resume-focus-btn');
+            const focusedOrder = allOrders.find(o => o.key === focusedOrderKey && o.status !== 'Delivered');
+            resumeBtn.classList.toggle('hidden', !focusedOrder);
+
+            if (activeQueue.length === 0) {
+                container.innerHTML = `<div class="bg-slate-800 border border-slate-700 p-6 rounded-2xl text-sm text-slate-400">No pending deliveries right now.</div>`;
+                return;
             }
 
-            container.innerHTML = myOrders.map(([id, o]) => `
-                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-3">
-                    <div class="flex justify-between items-start">
-                        <div>
-                            <span class="text-xs font-mono font-bold text-indigo-600">ORD-${id.slice(-6).toUpperCase()}</span>
-                            <h3 class="font-bold text-slate-900 text-base">${o.customerName}</h3>
-                            <p class="text-slate-500 text-xs">📞 ${o.customerPhone}</p>
+            container.innerHTML = activeQueue.map((o) => {
+                const itemsText = (o.items || []).map(i => `${i.name} ×${i.quantity || 1}`).join(', ');
+                return `
+                    <div class="bg-slate-800 border border-slate-700 p-5 rounded-2xl space-y-3">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <span class="font-mono text-xs font-bold text-indigo-400">ORD-${o.key.slice(-6).toUpperCase()}</span>
+                                <h3 class="text-base font-bold text-white mt-0.5">📍 ${o.customerAddress || 'No address'}</h3>
+                            </div>
+                            <span class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-400 text-slate-900">${o.status || 'Unassigned'}</span>
                         </div>
-                        <span class="px-2.5 py-1 rounded-full text-xs font-bold ${o.status === 'Assigned' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}">${o.status}</span>
+                        <p class="text-xs text-slate-300">${itemsText || 'Parcel'} • <strong class="text-emerald-400 font-mono">₮${formatMNT(o.total)}</strong></p>
+                        <p class="text-xs text-slate-400">👤 ${o.customerName || 'Customer'} (${o.customerPhone || '-'})</p>
+                        <button onclick="openFocusedOrderScreen('${o.key}')" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl text-xs transition">
+                            🎯 Focus Delivery & Show Order QR
+                        </button>
                     </div>
-                    <div class="bg-slate-50 p-3 rounded-xl text-xs space-y-1">
-                        <p>📍 <strong>Delivery Address:</strong> ${o.customerAddress}</p>
-                        <p>💰 <strong>Total Amount:</strong> ₮${o.total?.toLocaleString()}</p>
-                    </div>
-                    ${o.status === 'Assigned' ? `
-                        <button onclick="updateStatus('${id}', 'Picked Up')" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 rounded-xl text-xs transition">Confirm Pickup from Merchant</button>
-                    ` : `<p class="text-xs text-center text-indigo-600 font-semibold italic">En route! Ask customer to scan your QR code upon delivery.</p>`}
-                </div>
-            `).join('');
+                `;
+            }).join('');
         }
 
-        window.updateStatus = function(orderId, status) {
-            update(ref(db, `orders/${orderId}`), { status });
+        window.openFocusedOrderScreen = async function(orderKey) {
+            if (!orderKey || !currentDriver) return;
+            focusedOrderKey = orderKey;
+
+            const order = allOrders.find(o => o.key === orderKey);
+            if (order && (!order.driverId || order.status === 'Unassigned')) {
+                await update(ref(db, `orders/${orderKey}`), {
+                    driverId: currentDriver.id,
+                    driverName: currentDriver.name,
+                    status: order.status === 'Unassigned' ? 'Assigned' : order.status
+                });
+            }
+
+            document.getElementById('focused-delivery-overlay').classList.remove('hidden');
+            syncFocusedScreenWithOrder();
+        };
+
+        window.exitFocusedScreen = function() {
+            document.getElementById('focused-delivery-overlay').classList.add('hidden');
+        };
+
+        function syncFocusedScreenWithOrder() {
+            if (!focusedOrderKey) return;
+            const overlay = document.getElementById('focused-delivery-overlay');
+            if (overlay.classList.contains('hidden')) return;
+
+            const order = allOrders.find(o => o.key === focusedOrderKey);
+            if (!order) return;
+
+            const isDone = order.status === 'Delivered';
+            lastKnownFocusedStatus = order.status;
+
+            document.getElementById('focused-active-card').classList.toggle('hidden', isDone);
+            document.getElementById('next-delivery-picker').classList.toggle('hidden', !isDone);
+
+            if (!isDone) {
+                document.getElementById('focus-order-id').innerText = `ORD-${order.key.slice(-6).toUpperCase()}`;
+                document.getElementById('focus-status-badge').innerText = order.status || 'Assigned';
+                document.getElementById('focus-address').innerText = order.customerAddress || 'No address provided';
+                document.getElementById('focus-customer').innerText = order.customerName || 'Customer';
+                document.getElementById('focus-phone').innerText = order.customerPhone || '-';
+                document.getElementById('focus-items').innerText = (order.items || []).map(i => `${i.name} ×${i.quantity || 1}`).join(', ') || 'Delivery Order';
+                document.getElementById('focus-total').innerText = `₮${formatMNT(order.total)}`;
+
+                const qrPayload = order.orderQrCode || `DELIVERY_ORDER:${order.key}`;
+                document.getElementById('focus-qr-payload-text').innerText = qrPayload;
+                const qrBox = document.getElementById('focus-order-qr-box');
+                qrBox.innerHTML = "";
+                new QRCode(qrBox, {
+                    text: qrPayload,
+                    width: 170,
+                    height: 170,
+                    correctLevel: QRCode.CorrectLevel.H
+                });
+            } else {
+                renderNextDeliveryChoices(order.key);
+            }
+        }
+
+        function renderNextDeliveryChoices(justFinishedKey) {
+            const choicesContainer = document.getElementById('next-orders-choices');
+            const remaining = allOrders.filter(o => o.status !== 'Delivered' && o.key !== justFinishedKey);
+
+            if (remaining.length === 0) {
+                choicesContainer.innerHTML = `<div class="bg-slate-950 border border-slate-800 p-4 rounded-2xl text-center text-sm text-emerald-400 font-semibold">🎉 All deliveries in the queue are completed!</div>`;
+                return;
+            }
+
+            choicesContainer.innerHTML = remaining.map((o) => {
+                const itemsText = (o.items || []).map(i => `${i.name} ×${i.quantity || 1}`).join(', ');
+                return `
+                    <div class="bg-slate-950 border border-slate-800 hover:border-indigo-500 p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition">
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <span class="font-mono text-xs font-bold text-indigo-400">ORD-${o.key.slice(-6).toUpperCase()}</span>
+                                <span class="text-[11px] px-2 py-0.5 rounded-full bg-slate-800 text-amber-300 font-semibold">${o.status}</span>
+                            </div>
+                            <p class="text-base font-bold text-white mt-1">📍 ${o.customerAddress || '-'}</p>
+                            <p class="text-xs text-slate-400">${itemsText || 'Parcel'} • ₮${formatMNT(o.total)}</p>
+                        </div>
+                        <button onclick="selectNextDelivery('${o.key}')" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2.5 rounded-xl text-xs whitespace-nowrap transition">
+                            Deliver Next →
+                        </button>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        window.selectNextDelivery = async function(nextOrderKey) {
+            await openFocusedOrderScreen(nextOrderKey);
+        };
+
+        window.markFocusedPickedUp = async function() {
+            if (!focusedOrderKey || !currentDriver) return;
+            await update(ref(db, `orders/${focusedOrderKey}`), {
+                status: 'Picked Up',
+                driverId: currentDriver.id,
+                driverName: currentDriver.name
+            });
+        };
+
+        window.markFocusedDelivered = async function() {
+            if (!focusedOrderKey || !currentDriver) return;
+            await update(ref(db, `orders/${focusedOrderKey}`), {
+                status: 'Delivered',
+                driverId: currentDriver.id,
+                driverName: currentDriver.name,
+                deliveredAt: Date.now()
+            });
+        };
+
+        const savedDriver = sessionStorage.getItem("swiftroute_driver");
+        if (savedDriver) {
+            try {
+                currentDriver = JSON.parse(savedDriver);
+                if (currentDriver?.name && currentDriver?.id) {
+                    showDashboard();
+                }
+            } catch (_) {}
         }
     </script>
 </body>
