@@ -3,20 +3,52 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SwiftRoute | Customer Storefront</title>
+    <title>SwiftRoute | Customer Storefront & Wallet QR Login</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen">
+    <!-- Header -->
     <header class="bg-indigo-600 text-white shadow-md sticky top-0 z-50">
         <div class="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
             <h1 class="text-xl font-bold flex items-center gap-2">📦 SwiftRoute Express</h1>
-            <span id="active-order-badge" class="hidden bg-amber-400 text-slate-900 text-xs font-bold px-3 py-1 rounded-full animate-pulse">Active Order Track</span>
+            <div class="flex items-center gap-3">
+                <span id="active-order-badge" class="hidden bg-amber-400 text-slate-900 text-xs font-bold px-3 py-1 rounded-full animate-pulse">Active Order Track</span>
+                <div id="user-session-bar" class="hidden items-center gap-3 text-sm bg-indigo-700 px-3 py-1.5 rounded-xl">
+                    <span>👤 <strong id="nav-customer-name">Customer</strong></span>
+                    <span class="bg-indigo-950 text-emerald-400 font-mono font-bold px-2.5 py-0.5 rounded-lg">$<span id="nav-wallet-balance">0.00</span></span>
+                    <button onclick="logoutCustomer()" class="text-xs text-indigo-200 hover:text-white underline">Logout</button>
+                </div>
+            </div>
         </div>
     </header>
 
-    <main class="max-w-6xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <!-- Store Catalog -->
+    <!-- Wallet QR Login View -->
+    <div id="qr-login-view" class="max-w-md mx-auto mt-12 bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-5">
+        <div class="text-center">
+            <h2 class="text-2xl font-bold text-slate-900">Sign In with Wallet QR</h2>
+            <p class="text-xs text-slate-500 mt-1">Scan your Mobile Wallet QR code or enter your Account ID to log in and pay</p>
+        </div>
+
+        <button onclick="startLoginQrScanner()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl text-sm transition">
+            📷 Scan Wallet QR Code to Login
+        </button>
+
+        <div id="login-qr-reader" class="hidden w-full rounded-xl overflow-hidden border border-slate-200"></div>
+
+        <div class="border-t pt-4 space-y-3">
+            <label class="block text-xs font-semibold uppercase text-slate-500">Or Enter Account ID / QR Code Data</label>
+            <input type="text" id="manual-qr-or-id" placeholder="e.g. 10011 or {&quot;accountId&quot;:&quot;10011&quot;}" class="w-full px-3 py-2 border rounded-lg text-sm font-mono">
+            <button onclick="loginWithQrOrId(document.getElementById('manual-qr-or-id').value)" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-2.5 rounded-xl text-sm transition">
+                Continue with Account ID
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Delivery Storefront (Shown after Wallet QR Login) -->
+    <main id="storefront-main" class="hidden max-w-6xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <!-- Store Catalog & Custom Parcel -->
         <div class="lg:col-span-2 space-y-6">
             <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
                 <h2 class="text-lg font-bold mb-4 text-slate-900">🛍️ Quick Order Store</h2>
@@ -25,7 +57,6 @@
                 </div>
             </div>
 
-            <!-- Custom Parcel Request -->
             <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
                 <h2 class="text-lg font-bold mb-4 text-slate-900">📮 Send Custom Parcel / Package</h2>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -50,9 +81,9 @@
                     <p class="text-slate-400 py-2">Your cart is empty.</p>
                 </div>
                 <div class="border-t pt-4 space-y-3">
-                    <div>
-                        <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Your Name</label>
-                        <input type="text" id="cust-name" placeholder="Full Name" class="w-full px-3 py-2 border rounded-lg text-sm">
+                    <div class="flex justify-between items-center font-bold text-base">
+                        <span>Total:</span>
+                        <span id="cart-total-display" class="text-indigo-600">$0.00</span>
                     </div>
                     <div>
                         <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Delivery Address</label>
@@ -62,42 +93,61 @@
                         <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Phone Number</label>
                         <input type="text" id="cust-phone" placeholder="+976 ..." class="w-full px-3 py-2 border rounded-lg text-sm">
                     </div>
-                    <button onclick="placeOrder()" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl hover:bg-indigo-700 transition">Place Delivery Order</button>
+
+                    <button onclick="placeOrderWithWallet()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl text-sm transition">
+                        💳 Pay with Wallet & Place Order
+                    </button>
+                    <button onclick="openPaymentQrModal()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl text-sm transition">
+                        ⚡ Generate Payment QR Code
+                    </button>
                 </div>
             </div>
 
-            <!-- Live Order Tracking & QR Completion Card -->
+            <!-- Live Order Tracking Card -->
             <div id="tracking-card" class="hidden bg-gradient-to-br from-indigo-900 to-slate-900 text-white p-6 rounded-2xl shadow-lg space-y-4">
                 <div class="flex justify-between items-start">
                     <div>
                         <span class="text-xs uppercase tracking-wider text-indigo-300 font-semibold">Live Tracking</span>
                         <h3 id="track-id" class="text-lg font-bold">ORD-xxxx</h3>
                     </div>
-                    <span id="track-status" class="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-400 text-slate-900">Pending</span>
+                    <span id="track-status" class="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-400 text-slate-900">Unassigned</span>
                 </div>
                 <div class="space-y-1 text-sm text-slate-300">
                     <p>📍 <strong class="text-white">To:</strong> <span id="track-dest">-</span></p>
                     <p>🏍️ <strong class="text-white">Assigned Courier:</strong> <span id="track-driver">Unassigned</span></p>
                 </div>
-                
                 <div id="scan-action-box" class="hidden pt-2 border-t border-indigo-800">
                     <p class="text-xs text-indigo-200 mb-2">Driver has arrived! Scan their QR code to complete delivery and rate:</p>
-                    <button onclick="openScannerModal()" class="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-900 font-bold py-2.5 rounded-xl text-sm transition">📷 Scan Driver QR & Rate</button>
+                    <button onclick="openDriverScannerModal()" class="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-900 font-bold py-2.5 rounded-xl text-sm transition">📷 Scan Driver QR & Rate</button>
                 </div>
             </div>
         </div>
     </main>
 
-    <!-- QR Scanner & Rating Modal -->
+    <!-- Payment QR Generator Modal (Matches POS_INVOICE payload format) -->
+    <div id="payment-qr-modal" class="hidden fixed inset-0 bg-slate-950/80 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-sm w-full p-6 space-y-4 text-slate-900 text-center shadow-xl">
+            <div class="flex justify-between items-center">
+                <h3 class="font-bold text-lg">⚡ Payment QR Code</h3>
+                <button onclick="closePaymentQrModal()" class="text-slate-400 hover:text-slate-600 font-bold">✕</button>
+            </div>
+            <p class="text-xs text-slate-500">Scan this QR code with your Wallet scanner to pay:</p>
+            <div id="payment-qr-amount" class="text-2xl font-extrabold text-indigo-600">$0.00</div>
+            <div id="generated-payment-qr" class="flex justify-center p-3 bg-white border rounded-xl mx-auto w-max"></div>
+            <button onclick="confirmQrPaidAndPlaceOrder()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl text-sm transition">
+                ✓ I Have Paid via QR — Create Order
+            </button>
+        </div>
+    </div>
+
+    <!-- Driver QR Scanner & Rating Modal -->
     <div id="qr-modal" class="hidden fixed inset-0 bg-slate-950/80 z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 text-slate-900 shadow-xl">
             <div class="flex justify-between items-center">
                 <h3 class="font-bold text-lg">Scan Driver QR Code</h3>
-                <button onclick="closeScannerModal()" class="text-slate-400 hover:text-slate-600 font-bold">✕</button>
+                <button onclick="closeDriverScannerModal()" class="text-slate-400 hover:text-slate-600 font-bold">✕</button>
             </div>
-            
             <div id="reader" class="w-full rounded-xl overflow-hidden bg-slate-100"></div>
-
             <div id="rating-section" class="hidden space-y-3 pt-2 border-t">
                 <div class="text-center">
                     <p class="font-semibold text-sm text-emerald-600">✓ Driver Verified: <span id="scanned-driver-name"></span></p>
@@ -115,12 +165,13 @@
         </div>
     </div>
 
-    <!-- Firebase Realtime Database SDKs & Logic -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getDatabase, ref, push, onValue, update, set } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+        import { getFirestore, collection, query, where, getDocs, updateDoc, increment, addDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-        const firebaseConfig = {
+        // Delivery RTDB config
+        const deliveryConfig = {
             apiKey: "AIzaSyBzAlFc53i183dYa56nDFqEROIrJIiBUsg",
             authDomain: "delivery88-fffbf.firebaseapp.com",
             databaseURL: "https://delivery88-fffbf-default-rtdb.firebaseio.com",
@@ -131,31 +182,127 @@
             measurementId: "G-4CE6JWR7SR"
         };
 
-        const app = initializeApp(firebaseConfig);
-        const db = getDatabase(app);
+        // Wallet & POS Firestore config (from index (25).html & index (23).html)
+        const walletConfig = {
+            apiKey: "AIzaSyA03_nm4Zk3RXmgIxKbxXP-pEGWnzmsQOE",
+            authDomain: "pos21-8f88f.firebaseapp.com",
+            databaseURL: "https://pos21-8f88f-default-rtdb.firebaseio.com",
+            projectId: "pos21-8f88f",
+            storageBucket: "pos21-8f88f.firebasestorage.app",
+            messagingSenderId: "49870857272",
+            appId: "1:49870857272:web:d349580c3d5ebb6f93f2cd"
+        };
+
+        const deliveryApp = initializeApp(deliveryConfig, "deliveryApp");
+        const rtdb = getDatabase(deliveryApp);
+
+        const walletApp = initializeApp(walletConfig, "walletApp");
+        const walletDb = getFirestore(walletApp);
 
         let products = {};
         let cart = [];
+        let loggedInWallet = null;
+        let walletDocRef = null;
+        let unsubscribeWalletDoc = null;
+
         let currentTrackKey = null;
         let assignedDriverId = null;
         let assignedDriverName = '';
         let selectedRating = 5;
-        let html5QrcodeScanner = null;
+        let loginScanner = null;
+        let driverScanner = null;
+        let pendingInvoiceId = null;
 
-        // Load Products from RTDB
-        onValue(ref(db, 'products'), (snapshot) => {
+        // Load store products from RTDB
+        onValue(ref(rtdb, 'products'), (snapshot) => {
             const data = snapshot.val();
-            if(data) {
+            if (data) {
                 products = data;
             } else {
                 products = {
-                    'p1': { name: "Latte & Croissant Combo", price: 15000, category: "Food & Cafe" },
-                    'p2': { name: "Fresh Grocery Bag", price: 45000, category: "Groceries" },
-                    'p3': { name: "USB-C Fast Charger", price: 28000, category: "Electronics" }
+                    'p1': { name: "Latte & Croissant Combo", price: 15, category: "Food & Cafe" },
+                    'p2': { name: "Fresh Grocery Bag", price: 45, category: "Groceries" },
+                    'p3': { name: "USB-C Fast Charger", price: 28, category: "Electronics" }
                 };
             }
             renderStore();
         });
+
+        window.startLoginQrScanner = function() {
+            const readerEl = document.getElementById('login-qr-reader');
+            readerEl.classList.remove('hidden');
+            if (loginScanner) loginScanner.clear().catch(() => {});
+            loginScanner = new Html5QrcodeScanner("login-qr-reader", { fps: 10, qrbox: 220 });
+            loginScanner.render((decodedText) => {
+                loginScanner.clear().catch(() => {});
+                readerEl.classList.add('hidden');
+                window.loginWithQrOrId(decodedText);
+            }, () => {});
+        };
+
+        window.loginWithQrOrId = async function(rawInput) {
+            if (!rawInput || !rawInput.trim()) return alert("Please scan a Wallet QR code or enter an Account ID.");
+            let accountId = rawInput.trim();
+
+            // Support JSON payloads like {"type":"CUSTOMER_WALLET","accountId":"10011"} or {"accountId":"10011"}
+            try {
+                const parsed = JSON.parse(accountId);
+                if (parsed.accountId) accountId = String(parsed.accountId);
+            } catch (_) {
+                // Support colon-delimited strings like CUSTOMER_WALLET:10011:Alex
+                if (accountId.includes(":")) {
+                    const parts = accountId.split(":");
+                    if (parts[1]) accountId = parts[1].trim();
+                }
+            }
+
+            try {
+                const q = query(collection(walletDb, "accounts"), where("accountId", "==", accountId));
+                const snap = await getDocs(q);
+                if (snap.empty) {
+                    return alert(`Wallet account "${accountId}" not found.`);
+                }
+
+                const docSnap = snap.docs[0];
+                walletDocRef = docSnap.ref;
+                loggedInWallet = { id: docSnap.id, ...docSnap.data() };
+
+                document.getElementById('qr-login-view').classList.add('hidden');
+                document.getElementById('storefront-main').classList.remove('hidden');
+                document.getElementById('user-session-bar').classList.remove('hidden');
+                document.getElementById('user-session-bar').classList.add('flex');
+                updateWalletHeaderUI();
+
+                if (unsubscribeWalletDoc) unsubscribeWalletDoc();
+                unsubscribeWalletDoc = onSnapshot(walletDocRef, (updatedSnap) => {
+                    if (updatedSnap.exists()) {
+                        loggedInWallet = { id: updatedSnap.id, ...updatedSnap.data() };
+                        updateWalletHeaderUI();
+                    }
+                });
+            } catch (err) {
+                alert("Login error: " + err.message);
+            }
+        };
+
+        function updateWalletHeaderUI() {
+            if (!loggedInWallet) return;
+            document.getElementById('nav-customer-name').innerText = loggedInWallet.name || loggedInWallet.accountId;
+            document.getElementById('nav-wallet-balance').innerText = Number(loggedInWallet.balance || 0).toFixed(2);
+        }
+
+        window.logoutCustomer = function() {
+            if (unsubscribeWalletDoc) unsubscribeWalletDoc();
+            if (loginScanner) loginScanner.clear().catch(() => {});
+            loggedInWallet = null;
+            walletDocRef = null;
+            cart = [];
+            renderCart();
+            document.getElementById('user-session-bar').classList.add('hidden');
+            document.getElementById('user-session-bar').classList.remove('flex');
+            document.getElementById('storefront-main').classList.add('hidden');
+            document.getElementById('qr-login-view').classList.remove('hidden');
+        };
 
         window.renderStore = function() {
             const container = document.getElementById('product-list');
@@ -164,99 +311,189 @@
                     <div>
                         <span class="text-xs font-semibold text-indigo-600 uppercase">${p.category || 'General'}</span>
                         <h3 class="font-bold text-slate-900 mt-1">${p.name}</h3>
-                        <p class="text-slate-600 text-sm mt-1">₮${Number(p.price).toLocaleString()}</p>
+                        <p class="text-slate-600 text-sm mt-1">$${Number(p.price).toFixed(2)}</p>
                     </div>
                     <button onclick="addToCart('${id}')" class="mt-4 bg-slate-100 hover:bg-indigo-600 hover:text-white text-slate-800 font-medium py-2 rounded-lg text-sm transition">Add to Cart</button>
                 </div>
             `).join('');
-        }
+        };
 
         window.addToCart = function(id) {
             const p = products[id];
-            if(p) {
-                cart.push({ name: p.name, price: Number(p.price), category: p.category || 'General' });
+            if (p) {
+                cart.push({ name: p.name, price: Number(p.price), category: p.category || 'General', quantity: 1 });
                 renderCart();
             }
-        }
+        };
 
         window.addCustomParcel = function() {
             const pickup = document.getElementById('custom-pickup').value;
             const desc = document.getElementById('custom-desc').value;
-            if(!desc) return alert('Please enter package description');
-            cart.push({ name: `Custom: ${desc} (Pickup: ${pickup || 'Specified'})`, price: 20000, category: 'Custom Parcel' });
+            if (!desc) return alert('Please enter package description');
+            cart.push({ name: `Custom: ${desc} (Pickup: ${pickup || 'Specified'})`, price: 20, category: 'Custom Parcel', quantity: 1 });
             document.getElementById('custom-pickup').value = '';
             document.getElementById('custom-desc').value = '';
             renderCart();
-        }
+        };
 
         window.renderCart = function() {
             const container = document.getElementById('cart-items');
-            if(cart.length === 0) return container.innerHTML = `<p class="text-slate-400 py-2">Your cart is empty.</p>`;
+            if (cart.length === 0) {
+                container.innerHTML = `<p class="text-slate-400 py-2">Your cart is empty.</p>`;
+                document.getElementById('cart-total-display').innerText = "$0.00";
+                return;
+            }
             container.innerHTML = cart.map((item, idx) => `
                 <div class="py-2.5 flex justify-between items-center text-sm">
                     <div>
                         <p class="font-medium text-slate-800">${item.name}</p>
-                        <p class="text-xs text-slate-500">₮${Number(item.price).toLocaleString()}</p>
+                        <p class="text-xs text-slate-500">$${Number(item.price).toFixed(2)}</p>
                     </div>
                     <button onclick="cart.splice(${idx},1);renderCart()" class="text-red-500 hover:text-red-700 font-bold text-xs">Remove</button>
                 </div>
             `).join('');
-        }
+            const total = cart.reduce((sum, i) => sum + Number(i.price), 0);
+            document.getElementById('cart-total-display').innerText = `$${total.toFixed(2)}`;
+        };
 
-        window.placeOrder = function() {
-            if(cart.length === 0) return alert('Your cart is empty.');
-            const name = document.getElementById('cust-name').value.trim();
+        function validateCheckoutInputs() {
+            if (!loggedInWallet) {
+                alert("Please log in with your Wallet QR first.");
+                return false;
+            }
+            if (cart.length === 0) {
+                alert("Your cart is empty.");
+                return false;
+            }
             const address = document.getElementById('cust-address').value.trim();
             const phone = document.getElementById('cust-phone').value.trim();
-            if(!name || !address || !phone) return alert('Please fill in your name, delivery address, and phone number.');
+            if (!address || !phone) {
+                alert("Please fill in your delivery address and phone number.");
+                return false;
+            }
+            return true;
+        }
 
-            const newOrderRef = push(ref(db, 'orders'));
+        async function createDeliveryAndReceipt(totalAmount, invoiceId, paymentMethodLabel) {
+            const address = document.getElementById('cust-address').value.trim();
+            const phone = document.getElementById('cust-phone').value.trim();
+
+            const newOrderRef = push(ref(rtdb, 'orders'));
             const orderData = {
-                customerName: name,
+                customerName: loggedInWallet.name || loggedInWallet.accountId,
+                customerAccountId: String(loggedInWallet.accountId),
                 customerAddress: address,
                 customerPhone: phone,
                 items: cart,
-                total: cart.reduce((sum, i) => sum + i.price, 0),
+                total: totalAmount,
+                paymentMethod: paymentMethodLabel,
+                invoiceId: invoiceId,
                 status: 'Unassigned',
                 driverId: '',
                 driverName: 'Unassigned',
                 createdAt: Date.now()
             };
 
-            set(newOrderRef, orderData).then(() => {
-                currentTrackKey = newOrderRef.key;
-                cart = [];
-                renderCart();
-                document.getElementById('active-order-badge').classList.remove('hidden');
-                document.getElementById('tracking-card').classList.remove('hidden');
-                document.getElementById('track-id').innerText = `ORD-${currentTrackKey.slice(-6).toUpperCase()}`;
-                document.getElementById('track-dest').innerText = address;
+            await set(newOrderRef, orderData);
 
-                onValue(ref(db, `orders/${currentTrackKey}`), (snapshot) => {
-                    const data = snapshot.val();
-                    if(!data) return;
-                    document.getElementById('track-status').innerText = data.status;
-                    document.getElementById('track-driver').innerText = data.driverName || 'Unassigned';
-                    assignedDriverId = data.driverId;
-                    assignedDriverName = data.driverName;
+            await addDoc(collection(walletDb, "receipts"), {
+                accountId: String(loggedInWallet.accountId),
+                invoiceId: String(invoiceId),
+                amount: totalAmount,
+                items: cart,
+                createdAt: Date.now()
+            });
 
-                    if(data.status === 'Picked Up' || data.status === 'Assigned') {
-                        document.getElementById('scan-action-box').classList.remove('hidden');
-                    }
-                    if(data.status === 'Delivered') {
-                        document.getElementById('scan-action-box').classList.add('hidden');
-                    }
-                });
-                alert('Order placed successfully!');
-            }).catch(e => alert('Error placing order: ' + e.message));
+            currentTrackKey = newOrderRef.key;
+            cart = [];
+            renderCart();
+
+            document.getElementById('active-order-badge').classList.remove('hidden');
+            document.getElementById('tracking-card').classList.remove('hidden');
+            document.getElementById('track-id').innerText = `ORD-${currentTrackKey.slice(-6).toUpperCase()}`;
+            document.getElementById('track-dest').innerText = address;
+
+            onValue(ref(rtdb, `orders/${currentTrackKey}`), (snapshot) => {
+                const data = snapshot.val();
+                if (!data) return;
+                document.getElementById('track-status').innerText = data.status;
+                document.getElementById('track-driver').innerText = data.driverName || 'Unassigned';
+                assignedDriverId = data.driverId;
+                assignedDriverName = data.driverName;
+
+                if (data.status === 'Picked Up' || data.status === 'Assigned') {
+                    document.getElementById('scan-action-box').classList.remove('hidden');
+                }
+                if (data.status === 'Delivered') {
+                    document.getElementById('scan-action-box').classList.add('hidden');
+                }
+            });
         }
 
-        window.openScannerModal = function() {
+        window.placeOrderWithWallet = async function() {
+            if (!validateCheckoutInputs()) return;
+            const totalAmount = cart.reduce((sum, i) => sum + Number(i.price), 0);
+            const currentBal = Number(loggedInWallet.balance || 0);
+            if (currentBal < totalAmount) {
+                return alert(`Insufficient wallet balance ($${currentBal.toFixed(2)}) for $${totalAmount.toFixed(2)}.`);
+            }
+
+            try {
+                const invoiceId = "DLV_" + Date.now();
+                await updateDoc(walletDocRef, {
+                    balance: increment(-totalAmount),
+                    lastChargeTimestamp: Date.now(),
+                    lastChargeAmount: totalAmount
+                });
+                await createDeliveryAndReceipt(totalAmount, invoiceId, "Wallet Balance");
+                alert(`Order placed! Paid $${totalAmount.toFixed(2)} from Wallet.`);
+            } catch (err) {
+                alert("Payment failed: " + err.message);
+            }
+        };
+
+        window.openPaymentQrModal = function() {
+            if (!validateCheckoutInputs()) return;
+            const totalAmount = cart.reduce((sum, i) => sum + Number(i.price), 0);
+            pendingInvoiceId = "INV_" + Date.now();
+
+            document.getElementById('payment-qr-amount').innerText = `$${totalAmount.toFixed(2)}`;
+            const qrContainer = document.getElementById('generated-payment-qr');
+            qrContainer.innerHTML = "";
+            new QRCode(qrContainer, {
+                text: JSON.stringify({
+                    type: "POS_INVOICE",
+                    invoiceId: pendingInvoiceId,
+                    amount: totalAmount
+                }),
+                width: 180,
+                height: 180,
+                correctLevel: QRCode.CorrectLevel.H
+            });
+            document.getElementById('payment-qr-modal').classList.remove('hidden');
+        };
+
+        window.closePaymentQrModal = function() {
+            document.getElementById('payment-qr-modal').classList.add('hidden');
+        };
+
+        window.confirmQrPaidAndPlaceOrder = async function() {
+            const totalAmount = cart.reduce((sum, i) => sum + Number(i.price), 0);
+            try {
+                await createDeliveryAndReceipt(totalAmount, pendingInvoiceId || ("INV_" + Date.now()), "Wallet QR");
+                closePaymentQrModal();
+                alert("Delivery order placed!");
+            } catch (err) {
+                alert("Error creating order: " + err.message);
+            }
+        };
+
+        window.openDriverScannerModal = function() {
             document.getElementById('qr-modal').classList.remove('hidden');
-            html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 });
-            html5QrcodeScanner.render((decodedText) => {
-                if(decodedText.includes(assignedDriverId) || decodedText.length > 5) {
-                    html5QrcodeScanner.clear();
+            driverScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 });
+            driverScanner.render((decodedText) => {
+                if (decodedText.includes(assignedDriverId) || decodedText.length > 5) {
+                    driverScanner.clear();
                     document.getElementById('reader').style.display = 'none';
                     document.getElementById('scanned-driver-name').innerText = assignedDriverName;
                     document.getElementById('rating-section').classList.remove('hidden');
@@ -264,31 +501,31 @@
                     alert('Invalid driver QR code.');
                 }
             }, () => {});
-        }
+        };
 
-        window.closeScannerModal = function() {
-            if(html5QrcodeScanner) html5QrcodeScanner.clear().catch(() => {});
+        window.closeDriverScannerModal = function() {
+            if (driverScanner) driverScanner.clear().catch(() => {});
             document.getElementById('qr-modal').classList.add('hidden');
             document.getElementById('reader').style.display = 'block';
             document.getElementById('rating-section').classList.add('hidden');
-        }
+        };
 
         window.setRating = function(stars) {
             selectedRating = stars;
             document.querySelectorAll('.star').forEach((el, idx) => {
                 el.style.color = idx < stars ? '#f59e0b' : '#cbd5e1';
             });
-        }
+        };
 
         window.submitCompletion = function() {
-            update(ref(db, `orders/${currentTrackKey}`), {
+            update(ref(rtdb, `orders/${currentTrackKey}`), {
                 status: 'Delivered',
                 rating: selectedRating
             }).then(() => {
-                closeScannerModal();
+                closeDriverScannerModal();
                 alert(`Thank you! Completed with a ${selectedRating}-star rating.`);
             });
-        }
+        };
     </script>
 </body>
 </html>
